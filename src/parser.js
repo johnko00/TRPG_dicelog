@@ -226,7 +226,7 @@
     const isCoc6 = /^CCB\s*<=/i.test(commandForParser);
     const coc7Match = commandForParser.match(/^CC(?:[+-]?\d+)?\s*<=/i);
     const isTargetedD100 = /^1D100\s*<=/i.test(commandForParser);
-    const hasDiceCommand = /\b\d+[dD]\d+\b/.test(commandForParser);
+    const hasDiceCommand = /^\s*\d+[dD]\d+\b/.test(commandForParser);
     const unsupportedDiceCommand = isUnsupportedDiceCommand(commandForParser);
     const hasResultSeparator = body.includes('＞');
     if (unsupportedDiceCommand) {

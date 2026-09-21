@@ -139,6 +139,11 @@ test('unsupported dice-like commands remain unknown and preserve source fields',
   assert.equal(parser.parseMessage({ body: '普通の会話 ＞ これは会話です' }).itemType, 'message');
 });
 
+test('dice notation embedded in narrative text is not treated as a roll command', () => {
+  const item = parser.parseMessage({ body: 'ナレーション内に 1d3 という表記がある ＞ 続きの文章' });
+  assert.equal(item.itemType, 'message');
+});
+
 test('safe target expression evaluator rejects executable input', () => {
   assert.equal(parser.evaluateTargetExpression('14*5'), 70);
   assert.equal(parser.evaluateTargetExpression('45/2'), 22);

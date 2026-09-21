@@ -104,6 +104,9 @@ function emptySummary(file) {
     unknownCategories: {},
     suspiciousRolls: { count: 0, signatures: {} },
     statusNames: {},
+    statusMissingFieldCount: 0,
+    sanCheckRollCount: 0,
+    sanCheckBySystem: { CoC6: 0, CoC7: 0, unknown: 0 },
     multiRollMessages: 0,
     expandedRollCount: 0,
     targetMissingCount: 0,
@@ -124,6 +127,9 @@ function auditFile(file) {
     addCount(summary.itemTypes, item.itemType);
     if (item.itemType === 'status') {
       addCount(summary.statusNames, item.statusData?.statusName || 'unknown');
+      for (const field of ['speaker', 'statusName', 'before', 'after', 'delta', 'rawText']) {
+        if (item.statusData?.[field] == null || item.statusData?.[field] === '') summary.statusMissingFieldCount += 1;
+      }
       continue;
     }
     if (item.itemType === 'unknown') {
@@ -140,6 +146,10 @@ function auditFile(file) {
       addCount(summary.systems, roll.system || 'unknown');
       if (roll.isJudgement) summary.judgementRollCount += 1;
       else summary.nonJudgementDiceCount += 1;
+      if (roll.isJudgement && /正気度|SANチェック/i.test(roll.skillRaw || '')) {
+        summary.sanCheckRollCount += 1;
+        addCount(summary.sanCheckBySystem, roll.system || 'unknown');
+      }
       if (roll.normalizedResult && summary.results[roll.normalizedResult] != null) {
         summary.results[roll.normalizedResult] += 1;
       }
@@ -169,6 +179,9 @@ function aggregateSummaries(summaries) {
     for (const [key, value] of Object.entries(summary.suspiciousRolls.signatures)) addCount(totals.suspiciousRolls.signatures, key, value);
     totals.suspiciousRolls.count += summary.suspiciousRolls.count;
     for (const [key, value] of Object.entries(summary.statusNames)) addCount(totals.statusNames, key, value);
+    totals.statusMissingFieldCount += summary.statusMissingFieldCount;
+    totals.sanCheckRollCount += summary.sanCheckRollCount;
+    for (const key of Object.keys(totals.sanCheckBySystem)) totals.sanCheckBySystem[key] += summary.sanCheckBySystem[key] || 0;
     totals.multiRollMessages += summary.multiRollMessages;
     totals.expandedRollCount += summary.expandedRollCount;
     totals.targetMissingCount += summary.targetMissingCount;
