@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>TRPG LOG & BANK</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700&family=Nunito:wght@400;700&display=swap');
+
+    :root { 
+      --bg-color: #16161e; 
+      --text-color: #f1f5f9; 
+      --accent-color: #ff758c; 
+      --accent-gradient: linear-gradient(135deg, #ff7eb3, #ff758c);
+      --nav-bg: #1f1f2e; 
+      --card-bg: #272738;
+      --border-color: #3f3f5a; 
+      --success: #34d399; 
+      --danger: #fb7185;
+      --font-main: 'Nunito', 'M PLUS Rounded 1c', sans-serif;
+    }
+    body { 
+      margin: 0; font-family: var(--font-main); 
+      background: var(--bg-color); color: var(--text-color); display: flex; height: 100vh; 
+      user-select: none;
+    }
+    nav { width: 260px; background: var(--nav-bg); padding: 20px 0; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; box-shadow: 2px 0 10px rgba(0,0,0,0.2); z-index: 10;}
+    nav h2 { margin: 0 0 30px 20px; font-size: 1.8rem; font-weight: 700; color: #fff; background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    nav ul { list-style: none; padding: 0; margin: 0; }
+    nav li { padding: 15px 25px; cursor: pointer; border-left: 4px solid transparent; transition: all 0.3s ease; color: #cbd5e1; font-weight: bold; font-size: 1.05em; display: flex; align-items: center; gap: 10px;}
+    nav li:hover { background: rgba(255, 117, 140, 0.1); color: #fff; }
+    nav li.active { border-left-color: var(--accent-color); background: rgba(255, 117, 140, 0.15); color: #fff; }
+    
+    main { flex: 1; padding: 30px 40px; overflow-y: auto; box-sizing: border-box; user-select: auto; scroll-behavior: smooth; }
+    h1 { font-size: 2rem; margin-top: 0; margin-bottom: 20px; font-weight: 700; letter-spacing: 1px; display: flex; align-items: center; gap: 10px;}
+    h3 { font-size: 1.2rem; margin-top: 0; margin-bottom: 15px; color: #fff; }
+    
+    .help-text { background: rgba(255,255,255,0.03); padding: 15px 20px; border-radius: 12px; border-left: 4px solid var(--accent-color); margin-bottom: 25px; font-size: 0.95rem; color: #cbd5e1; line-height: 1.6; }
+    
+    .hidden { display: none !important; }
+    .card { background: var(--card-bg); padding: 25px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 25px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+    
+    table { width: 100%; border-collapse: collapse; background: var(--card-bg); border-radius: 16px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    th, td { border-bottom: 1px solid var(--border-color); padding: 15px; text-align: left; font-size: 0.95rem; }
+    th { background: rgba(0,0,0,0.2); font-weight: 700; color: #cbd5e1; text-transform: uppercase; font-size: 0.85em; letter-spacing: 1px;}
+    tr:last-child td { border-bottom: none; }
+    .clickable-row { cursor: pointer; transition: background 0.2s; }
+    .clickable-row:hover { background: rgba(255,255,255,0.05); }
+    .clickable-row.selected { background: rgba(255, 117, 140, 0.2); }
+    
+    button { padding: 10px 20px; cursor: pointer; background: var(--accent-gradient); color: #fff; border: none; border-radius: 12px; font-weight: 700; font-family: var(--font-main); font-size: 1rem; transition: transform 0.2s, box-shadow 0.2s; white-space: nowrap; box-shadow: 0 4px 10px rgba(255, 117, 140, 0.3); }
+    button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(255, 117, 140, 0.4); }
+    button:disabled { background: #475569; box-shadow: none; color: #94a3b8; cursor: not-allowed; transform: none; }
+    button.outline { background: transparent; border: 2px solid var(--border-color); color: var(--text-color); box-shadow: none; }
+    button.outline:hover { border-color: var(--accent-color); color: var(--accent-color); }
+    button.danger { background: transparent; border: 2px solid var(--danger); color: var(--danger); box-shadow: none; }
+    button.danger:hover { background: var(--danger); color: #fff; border-color: transparent;}
+    
+    input, select { padding: 12px 15px; background: rgba(0,0,0,0.2); color: #fff; border: 1px solid var(--border-color); border-radius: 12px; outline: none; font-family: var(--font-main); font-size: 1rem; transition: border 0.3s; }
+    input:focus, select:focus { border-color: var(--accent-color); background: rgba(0,0,0,0.4); }
+    input[type="checkbox"] { cursor: pointer; transform: scale(1.3); accent-color: var(--accent-color); }
+    
+    .badge { padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin: 2px; }
+    .badge.success { background: rgba(52, 211, 153, 0.2); color: #34d399; }
+    .badge.warning { background: rgba(251, 113, 133, 0.2); color: #fb7185; }
+    .badge.info { background: rgba(96, 165, 250, 0.2); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.5); }
+    .badge.critical { background: rgba(250, 204, 21, 0.18); color: #fde047; border: 1px solid rgba(250, 204, 21, 0.35); }
+    .badge.fumble { background: rgba(192, 132, 252, 0.18); color: #d8b4fe; border: 1px solid rgba(192, 132, 252, 0.35); }
+    
+    /* === モーダル === */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+    .modal { background: var(--card-bg); padding: 30px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.1); width: 450px; max-width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto; }
+    .modal.large { width: 700px; }
+
+    /* === カスタム検索プルダウン === */
+    .searchable-select { position: relative; width: 100%; margin-top: 5px; }
+    .searchable-select input[type="text"] { width: calc(100% - 32px); cursor: text; }
+    .select-options { position: absolute; top: 100%; left: 0; right: 0; max-height: 220px; overflow-y: auto; background: #1f1f2e; border: 1px solid var(--accent-color); border-radius: 12px; z-index: 1000; list-style: none; padding: 0; margin: 5px 0 0 0; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    .select-options li { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid var(--border-color); font-size: 0.95rem; }
+    .select-options li:hover { background: rgba(255,255,255,0.05); }
+
+    /* === 画像1: 推し貯金風カレンダー === */
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-top: 15px; }
+    .cal-header { text-align: center; font-weight: 700; color: #94a3b8; padding-bottom: 10px; font-size: 0.9rem; }
+    .cal-day { background: rgba(0,0,0,0.2); border-radius: 16px; min-height: 100px; display: flex; flex-direction: column; justify-content: space-between; padding: 10px; position: relative; overflow: hidden; cursor: pointer; transition: transform 0.2s; border: 1px solid transparent;}
+    .cal-day:hover { transform: scale(1.05); z-index: 2; border-color: var(--accent-color); }
+    .cal-day.has-data { border-color: rgba(255,255,255,0.1); }
+    .cal-day.has-img { background-size: cover; background-position: center; border: none; }
+    .cal-day.has-img::after { content: ''; position: absolute; top:0; left:0; right:0; bottom:0; background: linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.7) 100%); z-index: 1; }
+    .cal-date { font-weight: 700; font-size: 1.2rem; z-index: 2; position: relative; text-shadow: 0 2px 4px rgba(0,0,0,0.5); color: #fff;}
+    .cal-amounts { z-index: 2; position: relative; display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
+    .cal-amt { font-size: 0.85rem; font-weight: 700; background: rgba(0,0,0,0.5); padding: 2px 8px; border-radius: 10px; backdrop-filter: blur(2px);}
+    .cal-amt.plus { color: var(--accent-color); }
+    .cal-amt.minus { color: #cbd5e1; }
+
+    /* === 画像2: クイック入力グリッド === */
+    .quick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .quick-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: transform 0.2s; }
+    .quick-item:hover { transform: translateY(-5px); }
+    .quick-icon { width: 64px; height: 64px; border-radius: 50%; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin-bottom: 8px; box-shadow: inset 0 2px 5px rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.05); transition: background 0.3s;}
+    .quick-item:hover .quick-icon { background: var(--accent-gradient); box-shadow: 0 5px 15px rgba(255, 117, 140, 0.4); border-color: transparent;}
+    .quick-label { font-size: 0.85rem; font-weight: 700; text-align: center; color: #cbd5e1; }
+    .quick-price { font-size: 0.8rem; font-weight: bold; color: var(--accent-color); margin-top: 2px;}
+
+    /* === 画像3: リッチな履歴リスト === */
+    .history-list { display: flex; flex-direction: column; gap: 12px; }
+    .history-item { display: flex; align-items: center; background: rgba(0,0,0,0.2); padding: 15px 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.03); transition: background 0.2s;}
+    .history-item:hover { background: rgba(0,0,0,0.4); }
+    .hist-icon-wrap { width: 48px; height: 48px; border-radius: 50%; background: var(--accent-gradient); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-right: 15px; box-shadow: 0 4px 10px rgba(255, 117, 140, 0.3); flex-shrink: 0;}
+    .hist-icon-wrap.expense { background: #475569; box-shadow: none; }
+    .hist-info { flex: 1; }
+    .hist-title { font-weight: 700; font-size: 1.1rem; margin-bottom: 4px; color: #fff;}
+    .hist-sub { font-size: 0.85rem; color: #94a3b8; }
+    .hist-right { text-align: right; display: flex; align-items: center; gap: 15px;}
+    .hist-amount { font-weight: 700; font-size: 1.3rem; }
+    .hist-amount.plus { color: var(--accent-color); }
+    .hist-amount.minus { color: #cbd5e1; }
+
+    /* === プログレスバー === */
+    .progress-bar-bg { background: rgba(0,0,0,0.3); border-radius: 10px; height: 12px; width: 100%; overflow: hidden; margin-top: 10px; position: relative;}
+    .progress-bar-fill { background: var(--accent-gradient); height: 100%; border-radius: 10px; transition: width 1s ease-out; }
+
+  </style>
+</head>
+<body>
+  <nav>
+    <h2>TRPG BANK</h2>
+    <ul id="nav-menu">
+      <li data-target="dashboard" class="active"><span>🏠</span> ホーム</li>
+      <li data-target="logs"><span>🎲</span> ログ管理</li>
+      <li data-target="all-logs"><span>📋</span> ダイス一覧</li>
+      <li data-target="people"><span>👥</span> キャラ整理</li>
+      <li data-target="analysis"><span>📊</span> 分析・グラフ</li>
+      <li data-target="savings"><span>💰</span> TRPG貯金</li>
+      <li data-target="settings"><span>⚙️</span> 設定</li>
+    </ul>
+  </nav>
+
+  <main id="app-content">
+    
+    <!-- === ダッシュボード === -->
+    <section id="dashboard">
+      <h1>Dashboard</h1>
+      
+      <div class="card" style="display: flex; gap: 30px; justify-content: space-between; flex-wrap: wrap; background: linear-gradient(145deg, #272738 0%, #1e1e2f 100%);">
+        <div style="flex: 1; min-width: 200px;">
+          <p style="margin:0; color:#94a3b8; font-weight:700; font-size:0.9em; text-transform:uppercase;">Total Balance</p>
+          <h2 id="total-balance" style="color: #fff; margin:5px 0 10px 0; font-size: 2.5em; font-weight:800;">計算中...</h2>
+          <div style="display:flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 5px;">
+            <span style="color:var(--accent-color); font-weight:bold;">今月貯金: <span id="month-savings">0</span></span>
+            <span style="color:#cbd5e1;">支出: <span id="month-expenses">0</span></span>
+            <span style="color:#fff; font-weight:bold;">収支: <span id="month-balance">0円</span></span>
+          </div>
+          <div class="progress-bar-bg">
+            <div id="month-progress" class="progress-bar-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+        <div style="border-left: 2px solid rgba(255,255,255,0.05); padding-left: 30px; display:flex; flex-direction:column; justify-content:center;">
+          <p style="margin:0; color:#94a3b8; font-weight:700; font-size:0.9em;">今月のセッション</p>
+          <h2 id="month-stats" style="margin:5px 0 0 0; font-size: 2em; color: #fff;">-</h2>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 15px;">
+          <h3>今月の推し貯金カレンダー</h3>
+        </div>
+        <div id="calendar-container"></div>
+      </div>
+    </section>
+    
+    <!-- === TRPG貯金 === -->
+    <section id="savings" class="hidden">
+      <h1>TRPG貯金</h1>
+      
+      <!-- 手動入力エリア -->
+      <div class="card">
+        <h3>✨ かんたん記録</h3>
+        <p style="font-size:0.85em; color:#94a3b8; margin-top:-10px; margin-bottom:20px;">よく使う項目をタップすると、フォームに自動でセットされます。</p>
+        
+        <!-- 画像2風 クイックグリッド -->
+        <div class="quick-grid">
+          <div class="quick-item" onclick="setManualData('1c', 500, 'saving', '☀')">
+             <div class="quick-icon">☀</div><div class="quick-label">1c</div><div class="quick-price">¥500</div>
+          </div>
+          <div class="quick-item" onclick="setManualData('2-5', 100, 'saving', '🌤')">
+             <div class="quick-icon">🌤</div><div class="quick-label">2-5</div><div class="quick-price">¥100</div>
+          </div>
+          <div class="quick-item" onclick="setManualData('100F', 500, 'saving', '⛈')">
+             <div class="quick-icon">⛈</div><div class="quick-label">100f</div><div class="quick-price">¥500</div>
+          </div>
+          <div class="quick-item" onclick="setManualData('95-99', 100, 'saving', '🌧')">
+             <div class="quick-icon">🌧</div><div class="quick-label">95-99</div><div class="quick-price">¥100</div>
+          </div>
+          <div class="quick-item" onclick="setManualData('KP 1c', 1000, 'saving', '🐟')">
+             <div class="quick-icon">🐟</div><div class="quick-label">KP 1c</div><div class="quick-price">¥1,000</div>
+          </div>
+          <div class="quick-item" onclick="setManualData('1卓完了', 500, 'saving', '🎉')">
+             <div class="quick-icon">🎉</div><div class="quick-label">1卓</div><div class="quick-price">¥500</div>
+          </div>
+          <div class="quick-item" onclick="setManualData('感謝 神', 1000, 'saving', '💖')">
+             <div class="quick-icon">💖</div><div class="quick-label">感謝 神</div><div class="quick-price">¥1,000</div>
+          </div>
+          <div class="quick-item" onclick="setManualData('シナリオ購入', 500, 'expense', '🛒')">
+             <div class="quick-icon" style="background:#475569;">🛒</div><div class="quick-label" style="color:#cbd5e1;">シナリオ購入</div><div class="quick-price" style="color:#94a3b8;">(支出)</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 16px;">
+          <input type="date" id="manual-date" required>
+          <select id="manual-type"><option value="saving">貯金 (+)</option><option value="expense">出費 (-)</option></select>
+          <input type="text" id="manual-label" placeholder="タイトル" required style="flex:1;">
+          <input type="number" id="manual-amount" placeholder="金額" min="1" required style="width: 100px;">
+          <button id="btn-add-manual" style="padding: 10px 30px;">記録する</button>
+        </div>
+      </div>
+      
+      <!-- 未確定候補 -->
+      <div id="savings-candidates-container"></div>
+      
+      <!-- 画像3風 履歴リスト -->
+      <div class="card" style="margin-top: 30px;">
+        <h3 style="margin-top: 0; padding-bottom: 10px;">最近の記録</h3>
+        <div id="savings-history-container"></div>
+      </div>
+    </section>
+
+    <!-- === その他セクション (ログ、人物、全ログ、設定等) === -->
+    <section id="logs" class="hidden">
+      <h1>ログ管理</h1>
+      <div class="card" style="display: flex; gap: 15px; align-items: center;">
+        <input type="file" id="log-upload" accept=".html" multiple style="flex: 1; max-width: 400px;">
+      </div>
+      <div id="session-table-container"></div>
+    </section>
+
+    <section id="all-logs" class="hidden">
+      <h1>全ダイスログ 一覧</h1>
+      <div class="card" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: rgba(0,0,0,0.2);">
+        <input type="text" id="filter-log-pc" placeholder="PC名で検索..." style="flex: 1; min-width: 150px;">
+        <input type="text" id="filter-log-skill" placeholder="技能名で検索..." style="flex: 1; min-width: 150px;">
+        <select id="filter-log-result" style="width: 150px;">
+          <option value="">-- 全て --</option><option value="critical">クリティカル</option><option value="fumble">ファンブル</option><option value="success">成功</option><option value="failure">失敗</option>
+        </select>
+        <button id="btn-filter-logs" class="outline">検索</button>
+      </div>
+      <div id="all-logs-table-container"></div>
+    </section>
+    
+    <section id="people" class="hidden">
+      <h1>人物・名前整理</h1>
+      <div class="card" style="margin-bottom: 15px; display: flex; gap: 15px; align-items: center; flex-wrap:wrap; padding: 15px 25px;">
+        <div style="flex:1; min-width:200px;">
+          <span style="font-size: 0.85em; color: #94a3b8; display: block; margin-bottom: 5px;">現在登録されているPL</span>
+          <div id="display-registered-pls" style="display:flex; flex-wrap:wrap; gap:5px;"></div>
+        </div>
+        <button id="btn-create-pc" class="outline">＋ PC作成</button>
+        <button id="btn-create-pl" class="outline">＋ PL作成</button>
+        <button id="btn-batch-link" disabled>選択を一括紐付け</button>
+      </div>
+      <table id="people-table">
+        <thead><tr><th style="width: 40px; text-align: center;"><input type="checkbox" id="check-all-aliases"></th><th>ログ上の名前</th><th>状態</th><th>正式PC名</th><th>紐付PL</th><th>登場シナリオ</th><th>操作</th></tr></thead>
+        <tbody id="people-table-body"></tbody>
+      </table>
+    </section>
+    
+    <section id="analysis" class="hidden">
+      <h1>分析・グラフ</h1>
+      <div id="analysis-content"></div>
+    </section>
+    
+    <section id="settings" class="hidden">
+      <h1>設定</h1>
+      <div class="card">
+        <h3>自分のPL設定 (自動判定用)</h3>
+        <div style="display: flex; gap: 10px;">
+          <select id="setting-my-pl" style="flex: 1; max-width: 300px;"><option value="">-- 未設定 --</option></select>
+          <button id="btn-save-my-pl">設定を保存</button>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+          <h3>自動貯金ルールの設定</h3><button id="btn-create-rule" class="outline">＋ 新規ルール</button>
+        </div>
+        <table style="width: 100%;">
+          <thead><tr><th>ルール名</th><th>金額</th><th>対象出目</th><th>対象結果</th><th>操作</th></tr></thead>
+          <tbody id="settings-rules-list"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>登録済みPL（プレイヤー）管理</h3>
+        <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+          <input type="text" id="new-pl-name-settings" placeholder="新しいPL名" style="flex: 1; max-width: 300px;">
+          <button id="btn-create-pl-settings">追加</button>
+        </div>
+        <table style="max-width: 500px;">
+          <thead><tr><th>PL名</th><th>操作</th></tr></thead><tbody id="settings-pl-list"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modals (省略せず保持) -->
+  <div id="link-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h3>キャラクターの紐付け設定</h3><p style="color: #94a3b8;">対象: <strong id="link-target-name" style="color: #fff; font-size: 1.1em;"></strong></p><div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--accent-color);"><label style="display:block; margin-bottom: 8px; font-weight: bold; color: var(--accent-color);">担当PL (プレイヤー) を設定</label><select id="link-pc-pl" style="width: 100%;"><option value="">-- 変更しない / 未設定 --</option></select></div><div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;"><label style="display:block; margin-bottom: 8px; font-weight: bold;">それぞれ個別に新規PCとして登録</label><button id="btn-create-individual-link" style="width: 100%;">独立したPCとして登録</button></div><div style="text-align: center; margin: 10px 0; color: #94a3b8;">または</div><div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;"><label style="display:block; margin-bottom: 8px; font-weight: bold;">既存のPCに全てまとめる</label><div class="searchable-select" id="link-pc-dropdown"><input type="text" class="select-search" placeholder="PC名を入力・検索..." autocomplete="off"><input type="hidden" id="link-pc-id-value" class="select-value"><ul class="select-options hidden"></ul></div><button id="btn-save-link" style="width: 100%; margin-top: 10px;" class="outline">選択したPCにまとめる</button></div><div style="display: flex; justify-content: flex-end; margin-top: 20px;"><button class="outline" onclick="document.getElementById('link-modal-wrapper').classList.add('hidden')">キャンセル</button></div></div></div>
+  <div id="pc-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>PC情報の編集</h2><p style="color: #94a3b8;">ログ上の名前: <strong id="edit-alias-name-display" style="color: #fff;"></strong></p><label style="display:block; margin-bottom:15px; color: var(--accent-color); font-weight: bold;">担当PL:<br><select id="edit-pc-pl" style="width: 100%; margin-top: 5px;"><option value="">-- 未設定 --</option></select></label><label style="display:block; margin-bottom:15px;">紐付け先PC:<br><div class="searchable-select" id="edit-pc-dropdown"><input type="text" class="select-search" placeholder="PC名を入力・検索..." autocomplete="off"><input type="hidden" id="edit-pc-id-value" class="select-value"><ul class="select-options hidden"></ul></div></label><label style="display:flex; align-items: center; gap: 10px; margin-bottom:20px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px;"><input type="checkbox" id="edit-pc-excluded"><span>自動貯金の対象から除外する</span></label><div style="display: flex; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 10px;"><button id="btn-unlink-pc" class="danger">紐付けを解除</button><div style="display: flex; gap: 10px;"><button class="outline" onclick="document.getElementById('pc-edit-modal-wrapper').classList.add('hidden')">キャンセル</button><button id="btn-save-pc-info">保存</button></div></div></div></div>
+  <div id="rule-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>ルールの編集</h2><label style="display:block; margin-bottom:10px;">ルール名: <input type="text" id="edit-rule-name" style="width: calc(100% - 22px);"></label><label style="display:block; margin-bottom:10px;">金額(円): <input type="number" id="edit-rule-amount" style="width: calc(100% - 22px);"></label><label style="display:block; margin-bottom:10px;">出目(カンマ区切り): <input type="text" id="edit-rule-rolls" style="width: calc(100% - 22px);"></label><label style="display:block; margin-bottom:10px;">結果:<br><div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; margin-top: 5px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;"><label><input type="checkbox" class="rule-result-check" value="critical"> クリ</label><label><input type="checkbox" class="rule-result-check" value="fumble"> ファンブル</label><label><input type="checkbox" class="rule-result-check" value="special"> スペシャル</label><label><input type="checkbox" class="rule-result-check" value="success"> 成功</label></div></label><div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;"><button id="btn-save-rule">保存</button><button class="outline" onclick="document.getElementById('rule-edit-modal-wrapper').classList.add('hidden')">キャンセル</button></div></div></div>
+  <div id="session-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>セッション編集</h2><label style="display:block; margin-bottom:15px;">シナリオ名:<br><input type="text" id="edit-session-title" style="width: calc(100% - 22px); margin-top: 5px;"></label><label style="display:block; margin-bottom:15px;">セッション日:<br><input type="date" id="edit-session-date" style="width: calc(100% - 22px); margin-top: 5px;"></label><label style="display:block; margin-bottom:15px;">代表画像:<br><input type="file" id="edit-session-image" accept="image/*" style="width: calc(100% - 22px); margin-top: 5px;"></label><img id="edit-session-preview" style="max-width: 100%; max-height: 200px; display: none; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--border-color);" /><div style="display: flex; gap: 10px; justify-content: flex-end;"><button id="btn-save-session">保存</button><button class="outline" onclick="document.getElementById('session-edit-modal-wrapper').classList.add('hidden')">キャンセル</button></div></div></div>
+  <div id="ledger-detail-modal-wrapper" class="modal-overlay hidden"><div class="modal large"><h2>履歴の詳細</h2><p style="color: #94a3b8; margin-bottom: 15px;" id="ledger-detail-info"></p><div id="ledger-detail-list" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; max-height: 400px; overflow-y: auto;"></div><div style="display: flex; justify-content: flex-end; margin-top: 20px;"><button class="outline" onclick="document.getElementById('ledger-detail-modal-wrapper').classList.add('hidden')">閉じる</button></div></div></div>
+  <div id="calendar-detail-modal-wrapper" class="modal-overlay hidden"><div class="modal large"><h2 id="calendar-detail-date">日付詳細</h2><div id="calendar-detail-content" style="line-height:1.7;"></div><div style="display:flex; justify-content:flex-end; margin-top:20px;"><button class="outline" onclick="document.getElementById('calendar-detail-modal-wrapper').classList.add('hidden')">閉じる</button></div></div></div>
+
+  <script>
+    // --- クイック入力設定 ---
+    function setManualData(label, amount, type, icon) {
+      document.getElementById('manual-label').value = label;
+      document.getElementById('manual-amount').value = amount;
+      document.getElementById('manual-type').value = type;
+      // 必要に応じて色付け等のアニメーションを追加可能
+    }
+
+    // --- Global Utilities & DB Init ---
+    const generateId = () => crypto.randomUUID();
+    let db;
+    let myPlId = localStorage.getItem('myPlId') || null;
+
+    // ★ DBバージョン v9 に変更
+    const initDB = () => {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open('TRPGBankDB_v9', 1);
+        request.onupgradeneeded = (e) => {
+          const database = e.target.result;
+          ['sessions', 'sourceLogs', 'rollRecords', 'ledgerEntries', 'parsedItems', 'statusChanges', 'aliasMappings', 'pcs', 'pls', 'savingsRules'].forEach(name => {
+            if (!database.objectStoreNames.contains(name)) {
+              const opts = { keyPath: name === 'aliasMappings' ? 'rawNameNormalized' : 'id' };
+              const store = database.createObjectStore(name, opts);
+              if (name === 'sourceLogs') store.createIndex('fileHash', 'fileHash', { unique: true });
+              if (name === 'parsedItems') store.createIndex('sessionId', 'sessionId', { unique: false });
+            }
+          });
+        };
+        request.onsuccess = e => { 
+          db = e.target.result; 
+          const tx = db.transaction(['savingsRules'], 'readwrite');
+          const store = tx.objectStore('savingsRules');
+          store.count().onsuccess = countEvent => {
+            if (countEvent.target.result === 0) {
+              const DEFAULT_RULES = [
+                { id: generateId(), name: '自分の1クリ', amount: 500, condition: { exactRolls: [1], result: ['critical'] }, isEnabled: true },
+                { id: generateId(), name: '自分の100F', amount: 500, condition: { exactRolls: [100], result: ['fumble'] }, isEnabled: true },
+                { id: generateId(), name: '自分のクリティカル', amount: 100, condition: { result: ['critical'] }, isEnabled: true },
+                { id: generateId(), name: '自分のファンブル', amount: 100, condition: { result: ['fumble'] }, isEnabled: true }
+              ];
+              DEFAULT_RULES.forEach(r => store.add(r));
+            }
+          };
+          resolve(db); 
+        };
+        request.onerror = e => reject(e.target.error);
+      });
+    };
+
+    function normalizeName(name) { return name ? name.normalize('NFKC').replace(/^[\s ]+|[\s ]+$/g, '').replace(/[\s ]+/g, ' ') : ''; }
+
+    // --- Searchable Dropdown Logic ---
+    function initSearchableDropdown(containerId, plSelectId, getBaseAliasFn) {
+        const container = document.getElementById(containerId);
+        const input = container.querySelector('.select-search');
+        const hidden = container.querySelector('.select-value');
+        const ul = container.querySelector('.select-options');
+        const plSelect = document.getElementById(plSelectId);
+
+        function renderOptions() {
+            const selectedPlId = plSelect ? plSelect.value : null;
+            const baseAlias = getBaseAliasFn() || "";
+            let filteredPcs = currentPcList;
+            if (selectedPlId) filteredPcs = filteredPcs.filter(pc => pc.plId === selectedPlId);
+            const scoredPcs = filteredPcs.map(pc => {
+                let score = 0;
+                if (baseAlias) {
+                    const normBase = baseAlias.toLowerCase(); const normPc = pc.name.toLowerCase();
+                    if (normPc === normBase) score = 100; else if (normBase.includes(normPc) || normPc.includes(normBase)) score = 50;
+                }
+                return { ...pc, score };
+            }).sort((a, b) => { if (b.score !== a.score) return b.score - a.score; return a.name.localeCompare(b.name); });
+            
+            ul.innerHTML = '<li data-value="" style="color:#94a3b8;">-- 新規登録 / 未選択 --</li>';
+            scoredPcs.forEach(pc => {
+                const recMark = pc.score >= 50 ? '<span style="color:var(--accent-color); margin-right:5px; font-weight:bold;">✨ おすすめ</span>' : '';
+                ul.innerHTML += `<li class="${pc.score >= 50 ? 'recommend' : ''}" data-value="${pc.id}">${recMark}${pc.name}</li>`;
+            });
+        }
+
+        input.addEventListener('focus', () => { renderOptions(); ul.classList.remove('hidden'); });
+        input.addEventListener('input', () => {
+            const term = input.value.toLowerCase();
+            Array.from(ul.querySelectorAll('li')).forEach(li => {
+                if (!li.dataset.value) return;
+                li.style.display = li.textContent.toLowerCase().includes(term) ? 'block' : 'none';
+            });
+            ul.classList.remove('hidden');
+        });
+        ul.addEventListener('click', (e) => {
+            const li = e.target.closest('li');
+            if (li) { hidden.value = li.dataset.value; input.value = li.dataset.value ? li.textContent.replace('✨ おすすめ', '').trim() : ''; ul.classList.add('hidden'); hidden.dispatchEvent(new Event('change')); }
+        });
+        document.addEventListener('click', (e) => { if (!container.contains(e.target)) ul.classList.add('hidden'); });
+        if (plSelect) plSelect.addEventListener('change', () => {
+            renderOptions();
+            if (hidden.value && !currentPcList.find(pc => pc.id === hidden.value && pc.plId === plSelect.value)) { hidden.value = ''; input.value = ''; }
+        });
+        return { setValue: (pcId) => { hidden.value = pcId || ''; input.value = pcId ? currentPcList.find(p => p.id === pcId)?.name || '' : ''; } };
+    }
+
+    let linkDropdownCtrl, editDropdownCtrl;
+
+    // --- Parser & File Upload ---
+    function analyzeMessageData(item) {
+      const text = item.body;
+      const statusMatch = text.match(/(SAN|HP|MP|C)\s*:\s*(\d+)\s*(?:→|->|＞)\s*(\d+)/i);
+      if (statusMatch) {
+        item.itemType = 'status';
+        item.statusData = { stat: statusMatch[1].toUpperCase(), before: parseInt(statusMatch[2], 10), after: parseInt(statusMatch[3], 10), delta: parseInt(statusMatch[3], 10) - parseInt(statusMatch[2], 10) };
+        return item;
+      }
+      const rollParts = text.split('＞').map(s => s.trim());
+      const commandPart = rollParts[0];
+      const isDiceBot = /\d+[dD]\d+/i.test(commandPart) || /(CCB|CC<=|choice|sanc|res|CBR)/i.test(commandPart);
+
+      if (text.includes('＞') && isDiceBot) {
+        item.itemType = 'roll';
+        item.rollData = { system: 'unknown', result: 'unknown', rolledValue: null, targetValue: null, skillRaw: '' };
+        const resultPart = rollParts[rollParts.length - 1];
+        const targetMatch = commandPart.match(/\(1D100<=(\d+)\)/i);
+        if (targetMatch) item.rollData.targetValue = parseInt(targetMatch[1], 10);
+        const skillMatch = commandPart.match(/【(.*?)】|\s+([^\s\d\(\)]+)\s+\(1D100/);
+        if (skillMatch) item.rollData.skillRaw = (skillMatch[1] || skillMatch[2]).trim();
+        
+        if (commandPart.match(/^(CCB|1d100|1D100)/)) {
+          item.rollData.system = 'CoC6';
+          if (resultPart.match(/決定的成功|クリティカル/)) item.rollData.result = 'critical';
+          else if (resultPart.match(/致命的失敗|ファンブル/)) item.rollData.result = 'fumble';
+          else if (resultPart.includes('スペシャル')) item.rollData.result = 'special';
+          else if (resultPart.includes('成功')) item.rollData.result = 'success';
+          else if (resultPart.includes('失敗')) item.rollData.result = 'failure';
+        } else if (commandPart.startsWith('CC<=')) {
+          item.rollData.system = 'CoC7';
+          if (resultPart.includes('クリティカル')) item.rollData.result = 'critical';
+          else if (resultPart.includes('ファンブル')) item.rollData.result = 'fumble';
+          else if (resultPart.includes('イクストリーム')) item.rollData.result = 'extreme';
+          else if (resultPart.includes('ハード')) item.rollData.result = 'hard';
+          else if (resultPart.match(/レギュラー|成功/)) item.rollData.result = 'success';
+          else if (resultPart.includes('失敗')) item.rollData.result = 'failure';
+        }
+        const rolledMatch = rollParts.slice(1, -1).reverse().find(s => !isNaN(parseInt(s, 10)));
+        if (rolledMatch) item.rollData.rolledValue = parseInt(rolledMatch, 10);
+      } else { item.itemType = 'message'; }
+      return item;
+    }
+
+    function parseCcfoliaHtml(htmlString) {
+      const doc = new DOMParser().parseFromString(htmlString, 'text/html');
+      const items = [];
+      doc.querySelectorAll('p').forEach((p, index) => {
+        const spans = p.querySelectorAll('span');
+        if (spans.length >= 3) {
+          items.push(analyzeMessageData({ sequence: index + 1, channel: spans[0].textContent.trim(), rawSpeaker: spans[1].textContent.trim(), body: Array.from(spans).slice(2).map(s => s.textContent).join(' ').trim(), rawText: p.textContent.trim(), itemType: 'unknown' }));
+        }
+      });
+      return items;
+    }
+
+    async function handleFileUpload(file, db) {
+      const hashBuffer = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+      const fileHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+      return new Promise((resolve, reject) => {
+        db.transaction(['sourceLogs'], 'readonly').objectStore('sourceLogs').index('fileHash').get(fileHash).onsuccess = async e => {
+          if (e.target.result) return reject(new Error(`「${file.name}」は既に取り込まれています。`));
+          resolve({ fileName: file.name, fileHash, rawHtml: await file.text(), parsedItems: parseCcfoliaHtml(await file.text()) });
+        };
+      });
+    }
+
+    async function saveLogToDB(db, parsedData) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(['sessions', 'sourceLogs', 'parsedItems', 'rollRecords', 'statusChanges', 'aliasMappings'], 'readwrite');
+        const sessionId = generateId(), sourceLogId = generateId();
+        
+        tx.objectStore('sessions').add({ id: sessionId, title: parsedData.fileName.replace(/\.html$/i, ''), dateStart: new Date().toISOString().split('T')[0], dateEnd: null, systemHints: [], sourceLogIds: [sourceLogId], imageAssetId: null, memo: '', tags: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+        tx.objectStore('sourceLogs').add({ id: sourceLogId, sessionId, fileName: parsedData.fileName, fileHash: parsedData.fileHash, rawHtml: parsedData.rawHtml, importedAt: new Date().toISOString(), byteSize: new Blob([parsedData.rawHtml]).size, channelHint: null, sourceType: "ccfolia-html", parseVersion: 1 });
+
+        const uniqueNames = new Set();
+        parsedData.parsedItems.forEach(item => {
+          item.id = generateId(); item.sourceLogId = sourceLogId; item.sessionId = sessionId;
+          if (item.itemType === 'roll') {
+            uniqueNames.add(item.rawSpeaker);
+            item.rollId = generateId();
+            tx.objectStore('rollRecords').add({ id: item.rollId, parsedItemId: item.id, sessionId, sourceLogId, system: item.rollData.system, rawSpeaker: item.rawSpeaker, pcId: null, plId: null, rawCommand: item.body.split('＞')[0].trim(), skillRaw: item.rollData.skillRaw, skillCanonical: null, skillCategory: null, targetRaw: item.rollData.targetValue ? item.rollData.targetValue.toString() : null, targetValue: item.rollData.targetValue, rolledValue: item.rollData.rolledValue, result: item.rollData.result, resultRaw: item.body.split('＞').pop().trim(), bonusPenalty: null, difficulty: null, isJudgement: item.rollData.result !== 'unknown', isSanCheck: item.rollData.skillRaw.includes('正気度'), isExact1: item.rollData.rolledValue === 1, isExact100: item.rollData.rolledValue === 100, sequenceInSession: item.sequence });
+          }
+          tx.objectStore('parsedItems').add(item);
+        });
+
+        const aliasStore = tx.objectStore('aliasMappings');
+        uniqueNames.forEach(rawName => {
+          const normalized = normalizeName(rawName);
+          aliasStore.get(normalized).onsuccess = (e) => {
+            if (!e.target.result) aliasStore.add({ rawNameNormalized: normalized, rawNameExamples: [rawName], pcId: null, ignored: false, updatedAt: new Date().toISOString() });
+          };
+        });
+        tx.oncomplete = () => resolve({ sessionId, sourceLogId });
+        tx.onerror = e => reject(e.target.error);
+      });
+    }
+
+    // --- All Logs UI ---
+    let allRollRecordsForList = [];
+    let aliasDictForLogs = {};
+
+    function getResultBadge(resultStr) {
+      if (resultStr === 'critical') return '<span class="badge critical">クリティカル</span>';
+      if (resultStr === 'fumble') return '<span class="badge fumble">ファンブル</span>';
+      if (['success', 'hard', 'extreme', 'special'].includes(resultStr)) return '<span class="badge success">成功</span>';
+      if (resultStr === 'failure') return '<span class="badge warning">失敗</span>';
+      return '<span>-</span>';
+    }
+
+    async function renderAllDiceLogs(db) {
+      return new Promise(resolve => {
+        const tx = db.transaction(['rollRecords', 'aliasMappings', 'pcs', 'sessions'], 'readonly');
+        let rolls = [], aliases = [], pcs = [], sessions = [];
+        tx.objectStore('rollRecords').getAll().onsuccess = e => rolls = e.target.result;
+        tx.objectStore('aliasMappings').getAll().onsuccess = e => aliases = e.target.result;
+        tx.objectStore('pcs').getAll().onsuccess = e => pcs = e.target.result;
+        tx.objectStore('sessions').getAll().onsuccess = e => sessions = e.target.result;
+        
+        tx.oncomplete = () => {
+          aliasDictForLogs = {};
+          aliases.forEach(a => {
+             const pc = pcs.find(p => p.id === a.pcId);
+             aliasDictForLogs[a.rawNameNormalized] = pc ? pc.name : a.rawNameNormalized;
+          });
+          allRollRecordsForList = rolls.filter(r => r.isJudgement).map(r => {
+             const session = sessions.find(s => s.id === r.sessionId);
+             return { ...r, pcName: aliasDictForLogs[normalizeName(r.rawSpeaker)] || r.rawSpeaker, sessionTitle: session ? session.title : '不明', };
+          }).sort((a, b) => b.sequenceInSession - a.sequenceInSession);
+          applyLogFilter();
+          resolve();
+        };
+      });
+    }
+
+    function applyLogFilter() {
+      const pcFilter = document.getElementById('filter-log-pc').value.toLowerCase();
+      const skillFilter = document.getElementById('filter-log-skill').value.toLowerCase();
+      const resFilter = document.getElementById('filter-log-result').value;
+
+      const filtered = allRollRecordsForList.filter(r => {
+        if (pcFilter && !r.pcName.toLowerCase().includes(pcFilter)) return false;
+        if (skillFilter && !(r.skillRaw || '').toLowerCase().includes(skillFilter)) return false;
+        if (resFilter) {
+          if (resFilter === 'success' && !['success', 'hard', 'extreme', 'special'].includes(r.result)) return false;
+          if (resFilter === 'failure' && r.result !== 'failure') return false;
+          if (resFilter === 'critical' && r.result !== 'critical') return false;
+          if (resFilter === 'fumble' && r.result !== 'fumble') return false;
+        }
+        return true;
+      }).slice(0, 300);
+
+      const tbodyHTML = filtered.map(r => {
+        const val = r.rolledValue !== null ? r.rolledValue : '-'; const tar = r.targetValue !== null ? r.targetValue : '-';
+        return `<tr><td style="font-size: 0.8em; color: #94a3b8;">${r.sessionTitle}</td><td style="font-weight: bold;">${r.pcName}</td><td>${r.skillRaw || '-'}</td><td>${tar}</td><td style="font-weight: bold;">${val}</td><td>${getResultBadge(r.result)}</td></tr>`;
+      }).join('');
+      document.getElementById('all-logs-table-container').innerHTML = `<table><thead><tr><th>シナリオ</th><th>PC名</th><th>技能</th><th>目標値</th><th>出目</th><th>結果</th></tr></thead><tbody>${tbodyHTML || '<tr><td colspan="6" style="text-align:center;">該当なし</td></tr>'}</tbody></table>`;
+    }
+    document.getElementById('btn-filter-logs').addEventListener('click', applyLogFilter);
+
+    // --- Session Management UI ---
+    async function renderSessionList(db) {
+      return new Promise(resolve => {
+        const tx = db.transaction(['sessions', 'rollRecords'], 'readonly');
+        let sessions = [], rolls = [];
+        tx.objectStore('sessions').getAll().onsuccess = e => sessions = e.target.result;
+        tx.objectStore('rollRecords').getAll().onsuccess = e => rolls = e.target.result;
+        tx.oncomplete = () => {
+          const tbodyHTML = sessions.sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).map(s => {
+            const rollCount = rolls.filter(r => r.sessionId === s.id && r.isJudgement).length;
+            const createdDate = new Date(s.createdAt).toLocaleString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+            const imgBadge = s.imageAssetId ? '<span class="badge success">画像あり</span>' : '';
+            return `<tr><td>${createdDate}</td><td>${s.dateStart || '-'}</td><td style="font-weight:bold;">${s.title} ${imgBadge}</td><td>${rollCount}回</td><td><button class="outline btn-session-edit" data-id="${s.id}">編集</button></td></tr>`;
+          }).join('');
+          document.getElementById('session-table-container').innerHTML = `<table><thead><tr><th>読込日時</th><th>セッション日</th><th>シナリオ名</th><th>判定数</th><th>操作</th></tr></thead><tbody id="session-table-body">${tbodyHTML}</tbody></table>`;
+          resolve();
+        };
+      });
+    }
+
+    let editingSessionId = null;
+    document.getElementById('session-table-container').addEventListener('click', e => {
+      if (e.target.classList.contains('btn-session-edit')) {
+        const sessionId = e.target.dataset.id;
+        db.transaction(['sessions'], 'readonly').objectStore('sessions').get(sessionId).onsuccess = ev => {
+          const s = ev.target.result; if (!s) return;
+          editingSessionId = s.id; document.getElementById('edit-session-title').value = s.title; document.getElementById('edit-session-date').value = s.dateStart || '';
+          const preview = document.getElementById('edit-session-preview');
+          if (s.imageAssetId) { preview.src = s.imageAssetId; preview.style.display = 'block'; } else { preview.src = ''; preview.style.display = 'none'; }
+          document.getElementById('session-edit-modal-wrapper').classList.remove('hidden');
+        };
+      }
+    });
+
+    document.getElementById('edit-session-image').addEventListener('change', e => {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => { const preview = document.getElementById('edit-session-preview'); preview.src = ev.target.result; preview.style.display = 'block'; };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('btn-save-session').addEventListener('click', async () => {
+      const file = document.getElementById('edit-session-image').files[0]; let dataUrl = document.getElementById('edit-session-preview').src;
+      if (file) {
+        dataUrl = await new Promise(res => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+            let {width, height} = img; const max = 1200;
+            if(width > max || height > max) { if(width > height) { height *= max/width; width = max; } else { width *= max/height; height = max; } }
+            canvas.width = width; canvas.height = height; ctx.drawImage(img, 0, 0, width, height); res(canvas.toDataURL('image/jpeg', 0.8));
+          }; img.src = dataUrl;
+        });
+      }
+      const tx = db.transaction(['sessions'], 'readwrite');
+      tx.objectStore('sessions').get(editingSessionId).onsuccess = e => {
+        const s = e.target.result; s.title = document.getElementById('edit-session-title').value; s.dateStart = document.getElementById('edit-session-date').value;
+        if (dataUrl && dataUrl.startsWith('data:image')) s.imageAssetId = dataUrl; s.updatedAt = new Date().toISOString(); tx.objectStore('sessions').put(s);
+      };
+      tx.oncomplete = () => { document.getElementById('session-edit-modal-wrapper').classList.add('hidden'); renderSessionList(db); renderDashboardSummary(db); };
+    });
+
+    // --- People Management UI ---
+    let currentPcList = [], currentAliasList = [], currentPlList = [];
+    let lastCheckedIndex = null;
+    function updateBatchButtonState() {
+      const checkedCount = document.querySelectorAll('.alias-checkbox:checked').length;
+      const btn = document.getElementById('btn-batch-link');
+      btn.disabled = checkedCount === 0; btn.textContent = checkedCount > 0 ? `${checkedCount}件を選択して一括紐付け` : '選択した項目を一括紐付け';
+      document.querySelectorAll('#people-table-body tr').forEach(tr => { const cb = tr.querySelector('.alias-checkbox'); if (cb && cb.checked) tr.classList.add('selected'); else tr.classList.remove('selected'); });
+    }
+
+    async function loadPeopleData(db) {
+      return new Promise(resolve => {
+        const tx = db.transaction(['aliasMappings', 'pcs', 'pls', 'rollRecords', 'sessions'], 'readonly');
+        let rolls = [], sessions = [];
+        tx.objectStore('aliasMappings').getAll().onsuccess = e => currentAliasList = e.target.result;
+        tx.objectStore('pcs').getAll().onsuccess = e => currentPcList = e.target.result;
+        tx.objectStore('pls').getAll().onsuccess = e => currentPlList = e.target.result;
+        tx.objectStore('rollRecords').getAll().onsuccess = e => rolls = e.target.result;
+        tx.objectStore('sessions').getAll().onsuccess = e => sessions = e.target.result;
+        
+        tx.oncomplete = () => {
+          const plDisplay = document.getElementById('display-registered-pls');
+          if (currentPlList.length === 0) { plDisplay.innerHTML = '<span style="color:#94a3b8;">まだ登録されていません</span>'; } 
+          else { plDisplay.innerHTML = currentPlList.map(pl => `<span class="badge info">${pl.name}</span>`).join(' '); }
+
+          const speakerToSessions = {};
+          rolls.forEach(r => { const norm = normalizeName(r.rawSpeaker); if (!speakerToSessions[norm]) speakerToSessions[norm] = new Set(); speakerToSessions[norm].add(r.sessionId); });
+
+          const tbody = document.getElementById('people-table-body');
+          tbody.innerHTML = currentAliasList.map(alias => {
+            const pc = currentPcList.find(p => p.id === alias.pcId); const pl = pc ? currentPlList.find(p => p.id === pc.plId) : null;
+            const statusBadge = pc ? `<span class="badge success">整理済み</span>` : `<span class="badge warning">未整理</span>`;
+            const sIds = Array.from(speakerToSessions[alias.rawNameNormalized] || []);
+            const sTitles = sIds.map(id => sessions.find(s=>s.id===id)?.title || '不明').join(', ');
+            const actionBtn = pc ? `<button class="outline btn-pc-edit" data-id="${pc.id}" data-alias="${alias.rawNameNormalized}">編集</button>` : `<button class="btn-single-link" data-alias="${alias.rawNameNormalized}">紐付け</button>`;
+            return `<tr class="clickable-row"><td style="text-align: center;"><input type="checkbox" class="alias-checkbox" value="${alias.rawNameNormalized}"></td><td>${alias.rawNameNormalized}</td><td>${statusBadge}</td><td style="font-weight: bold;">${pc ? pc.name : '-'}</td><td>${pl ? pl.name : '-'}</td><td><span style="font-size:0.85em; color:#94a3b8;">${sTitles||'-'}</span></td><td>${actionBtn}</td></tr>`;
+          }).join('');
+          
+          document.getElementById('check-all-aliases').checked = false; lastCheckedIndex = null; updateBatchButtonState(); renderSettingsPlList(); resolve();
+        };
+      });
+    }
+
+    document.getElementById('people-table-body').addEventListener('click', (e) => {
+      if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+        if (e.target.classList.contains('btn-single-link')) openLinkModal(e.target.dataset.alias);
+        if (e.target.classList.contains('btn-pc-edit')) openPcEdit(e.target.dataset.id, e.target.dataset.alias);
+        return;
+      }
+      const tr = e.target.closest('tr'); if (!tr) return;
+      const checkbox = tr.querySelector('.alias-checkbox'); if (!checkbox) return;
+      if (e.target !== checkbox) checkbox.checked = !checkbox.checked;
+      const allRows = Array.from(document.querySelectorAll('#people-table-body tr')); const currentIndex = allRows.indexOf(tr);
+      if (e.shiftKey && lastCheckedIndex !== null) {
+        const start = Math.min(lastCheckedIndex, currentIndex), end = Math.max(lastCheckedIndex, currentIndex);
+        for (let i = start; i <= end; i++) { const cb = allRows[i].querySelector('.alias-checkbox'); if (cb) cb.checked = checkbox.checked; }
+      }
+      lastCheckedIndex = currentIndex; updateBatchButtonState();
+    });
+
+    document.getElementById('check-all-aliases').addEventListener('change', (e) => { document.querySelectorAll('.alias-checkbox').forEach(cb => cb.checked = e.target.checked); updateBatchButtonState(); });
+    document.getElementById('btn-create-pc').addEventListener('click', () => { const name = prompt('新しいPC名を入力してください:'); if (name) { db.transaction(['pcs'], 'readwrite').objectStore('pcs').add({ id: generateId(), name, plId: null, type: "PC", excludedFromSavings: false, memo: "", imageAssetId: null }).transaction.oncomplete = () => loadPeopleData(db); } });
+    function createNewPL(name) { if (!name) return; db.transaction(['pls'], 'readwrite').objectStore('pls').add({ id: generateId(), name, isSelf: false, memo: "" }).transaction.oncomplete = () => { loadPeopleData(db); }; }
+    document.getElementById('btn-create-pl').addEventListener('click', () => { createNewPL(prompt('新しいPL名を入力してください:')); });
+    document.getElementById('btn-create-pl-settings').addEventListener('click', () => { const input = document.getElementById('new-pl-name-settings'); createNewPL(input.value.trim()); input.value = ''; });
+
+    let activeAliasNames = [];
+    window.openLinkModal = function(singleAlias) {
+      activeAliasNames = singleAlias ? [singleAlias] : Array.from(document.querySelectorAll('.alias-checkbox:checked')).map(cb => cb.value);
+      if (activeAliasNames.length === 0) return;
+      document.getElementById('link-target-name').textContent = activeAliasNames.length === 1 ? activeAliasNames[0] : `${activeAliasNames[0]} ほか計${activeAliasNames.length}件`;
+      document.getElementById('link-pc-pl').innerHTML = '<option value="">-- 変更しない / 未設定 --</option>' + currentPlList.map(pl => `<option value="${pl.id}">${pl.name}</option>`).join(''); document.getElementById('link-pc-pl').value = '';
+      linkDropdownCtrl.setValue(''); document.getElementById('link-modal-wrapper').classList.remove('hidden');
+    };
+
+    document.getElementById('btn-batch-link').addEventListener('click', () => openLinkModal(null));
+    document.getElementById('btn-save-link').addEventListener('click', () => { 
+      const selectedPcId = document.getElementById('link-pc-id-value').value;
+      if (!selectedPcId) return alert('既存のPCを選択してください。');
+      applyPcLink(activeAliasNames, selectedPcId, document.getElementById('link-pc-pl').value || null); 
+    });
+    document.getElementById('btn-create-individual-link').addEventListener('click', () => {
+      const plId = document.getElementById('link-pc-pl').value || null; const tx = db.transaction(['pcs', 'aliasMappings'], 'readwrite'); const pcStore = tx.objectStore('pcs'); const aliasStore = tx.objectStore('aliasMappings');
+      activeAliasNames.forEach(aliasName => {
+        const newPcId = generateId(); pcStore.add({ id: newPcId, name: aliasName, plId: plId, type: "PC", excludedFromSavings: false, memo: "", imageAssetId: null });
+        aliasStore.get(aliasName).onsuccess = e => { if (e.target.result) { e.target.result.pcId = newPcId; aliasStore.put(e.target.result); } };
+      });
+      tx.oncomplete = () => { document.getElementById('link-modal-wrapper').classList.add('hidden'); loadPeopleData(db); };
+    });
+
+    function applyPcLink(aliasNames, pcId, plId) {
+      const tx = db.transaction(['aliasMappings', 'pcs'], 'readwrite');
+      if (pcId && plId) { tx.objectStore('pcs').get(pcId).onsuccess = e => { if (e.target.result) { e.target.result.plId = plId; tx.objectStore('pcs').put(e.target.result); } }; }
+      aliasNames.forEach(name => { tx.objectStore('aliasMappings').get(name).onsuccess = e => { if (e.target.result) { e.target.result.pcId = pcId; tx.objectStore('aliasMappings').put(e.target.result); } }; });
+      tx.oncomplete = () => { document.getElementById('link-modal-wrapper').classList.add('hidden'); loadPeopleData(db); };
+    }
+
+    let editingPcId = null; let editingAliasName = null;
+    window.openPcEdit = function(pcId, aliasName) {
+      db.transaction(['pcs'], 'readonly').objectStore('pcs').get(pcId).onsuccess = e => {
+        const pc = e.target.result; if (!pc) return;
+        editingPcId = pc.id; editingAliasName = aliasName; document.getElementById('edit-alias-name-display').textContent = aliasName;
+        document.getElementById('edit-pc-pl').innerHTML = '<option value="">-- 未設定 --</option>' + currentPlList.map(pl => `<option value="${pl.id}">${pl.name}</option>`).join(''); document.getElementById('edit-pc-pl').value = pc.plId || '';
+        editDropdownCtrl.setValue(pc.id); document.getElementById('edit-pc-excluded').checked = !!pc.excludedFromSavings; document.getElementById('pc-edit-modal-wrapper').classList.remove('hidden');
+      };
+    };
+    document.getElementById('edit-pc-id-value').addEventListener('change', e => {
+        const selectedPcId = e.target.value;
+        if (selectedPcId) { const pc = currentPcList.find(p => p.id === selectedPcId); if (pc) { if(pc.plId) document.getElementById('edit-pc-pl').value = pc.plId; document.getElementById('edit-pc-excluded').checked = !!pc.excludedFromSavings; } }
+    });
+    document.getElementById('btn-unlink-pc').addEventListener('click', () => {
+      if (!confirm(`「${editingAliasName}」の紐付けを解除して未整理状態に戻しますか？`)) return;
+      const tx = db.transaction(['aliasMappings'], 'readwrite');
+      tx.objectStore('aliasMappings').get(editingAliasName).onsuccess = e => { if (e.target.result) { e.target.result.pcId = null; tx.objectStore('aliasMappings').put(e.target.result); } };
+      tx.oncomplete = () => { document.getElementById('pc-edit-modal-wrapper').classList.add('hidden'); loadPeopleData(db); };
+    });
+    document.getElementById('btn-save-pc-info').addEventListener('click', () => {
+      const selectedPcId = document.getElementById('edit-pc-id-value').value, selectedPlId = document.getElementById('edit-pc-pl').value || null, excluded = document.getElementById('edit-pc-excluded').checked;
+      if (!selectedPcId) return alert('紐付け先PCを選択してください。');
+      const tx = db.transaction(['pcs', 'aliasMappings'], 'readwrite');
+      tx.objectStore('pcs').get(selectedPcId).onsuccess = e => { const pc = e.target.result; if(pc) { pc.plId = selectedPlId; pc.excludedFromSavings = excluded; tx.objectStore('pcs').put(pc); } };
+      tx.objectStore('aliasMappings').get(editingAliasName).onsuccess = e => { if (e.target.result) { e.target.result.pcId = selectedPcId; tx.objectStore('aliasMappings').put(e.target.result); } };
+      tx.oncomplete = () => { document.getElementById('pc-edit-modal-wrapper').classList.add('hidden'); loadPeopleData(db); };
+    });
+
+    // --- Settings & PL UI ---
+    function renderSettingsPlList() {
+      const tbody = document.getElementById('settings-pl-list'), select = document.getElementById('setting-my-pl');
+      tbody.innerHTML = currentPlList.map(pl => `<tr><td style="font-weight:bold;">${pl.name} ${pl.id === myPlId ? '<span class="badge success">自分のPL</span>' : ''}</td><td><button class="outline" onclick="renamePl('${pl.id}')" style="padding: 4px 8px; font-size: 0.85em;">名前変更</button> <button class="danger" onclick="deletePl('${pl.id}')" style="padding: 4px 8px; font-size: 0.85em;">削除</button></td></tr>`).join('');
+      select.innerHTML = '<option value="">-- 未設定 --</option>' + currentPlList.map(pl => `<option value="${pl.id}">${pl.name}</option>`).join(''); select.value = myPlId || '';
+    }
+    window.renamePl = function(id) { const pl = currentPlList.find(p => p.id === id); const newName = prompt('PLの新しい名前:', pl.name); if (newName && newName !== pl.name) { const tx = db.transaction(['pls'], 'readwrite'); tx.objectStore('pls').get(id).onsuccess = e => { e.target.result.name = newName; tx.objectStore('pls').put(e.target.result); }; tx.oncomplete = () => loadPeopleData(db); } };
+    window.deletePl = function(id) { if(confirm('このPLを削除しますか？\n（PCとの紐付けは解除されますが、ログ自体は消えません）')) { const tx = db.transaction(['pls', 'pcs'], 'readwrite'); tx.objectStore('pls').delete(id); tx.objectStore('pcs').getAll().onsuccess = e => { e.target.result.forEach(pc => { if(pc.plId === id) { pc.plId = null; tx.objectStore('pcs').put(pc); } }); }; tx.oncomplete = () => loadPeopleData(db); } };
+    document.getElementById('btn-save-my-pl').addEventListener('click', () => { myPlId = document.getElementById('setting-my-pl').value; localStorage.setItem('myPlId', myPlId); alert('自分のPL設定を保存しました。'); loadPeopleData(db); renderSavings(db); });
+
+    // --- Savings Rules UI ---
+    let currentRules = [];
+    async function loadSavingsRules(db) {
+      return new Promise(resolve => {
+        db.transaction(['savingsRules'], 'readonly').objectStore('savingsRules').getAll().onsuccess = e => {
+          currentRules = e.target.result;
+          document.getElementById('settings-rules-list').innerHTML = currentRules.map(r => `<tr><td>${r.name}</td><td style="color:var(--success);">+${r.amount}円</td><td>${(r.condition.exactRolls && r.condition.exactRolls.length) ? r.condition.exactRolls.join(', ') : 'すべて'}</td><td>${(r.condition.result && r.condition.result.length) ? r.condition.result.join(', ') : '指定なし'}</td><td><button class="outline" onclick="openRuleEdit('${r.id}')" style="padding: 4px 8px; font-size: 0.85em;">編集</button> <button class="danger" onclick="deleteRule('${r.id}')" style="padding: 4px 8px; font-size: 0.85em;">削除</button></td></tr>`).join('');
+          resolve();
+        };
+      });
+    }
+
+    let editingRuleId = null;
+    window.openRuleEdit = function(id) {
+      editingRuleId = id; const r = currentRules.find(x => x.id === id);
+      document.getElementById('edit-rule-name').value = r ? r.name : ''; document.getElementById('edit-rule-amount').value = r ? r.amount : 500;
+      document.getElementById('edit-rule-rolls').value = (r && r.condition.exactRolls) ? r.condition.exactRolls.join(', ') : '';
+      const checks = document.querySelectorAll('.rule-result-check'); checks.forEach(cb => cb.checked = false);
+      if (r && r.condition.result) checks.forEach(cb => { if (r.condition.result.includes(cb.value)) cb.checked = true; });
+      document.getElementById('rule-edit-modal-wrapper').classList.remove('hidden');
+    }
+    document.getElementById('btn-create-rule').addEventListener('click', () => { openRuleEdit(null); });
+    document.getElementById('btn-save-rule').addEventListener('click', () => {
+      const name = document.getElementById('edit-rule-name').value, amount = parseInt(document.getElementById('edit-rule-amount').value, 10) || 0;
+      const rollsStr = document.getElementById('edit-rule-rolls').value.trim(), exactRolls = rollsStr ? rollsStr.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n)) : null;
+      const results = Array.from(document.querySelectorAll('.rule-result-check:checked')).map(cb => cb.value);
+      if (!name) return alert('ルール名を入力してください');
+      const rule = { id: editingRuleId || generateId(), name: name, amount: amount, isEnabled: true, condition: { exactRolls: (exactRolls && exactRolls.length > 0) ? exactRolls : null, result: results.length > 0 ? results : null } };
+      const tx = db.transaction(['savingsRules'], 'readwrite'); if (editingRuleId) tx.objectStore('savingsRules').put(rule); else tx.objectStore('savingsRules').add(rule);
+      tx.oncomplete = () => { document.getElementById('rule-edit-modal-wrapper').classList.add('hidden'); loadSavingsRules(db); renderSavings(db); };
+    });
+    window.deleteRule = function(id) { if(confirm('この貯金ルールを削除しますか？')) db.transaction(['savingsRules'], 'readwrite').objectStore('savingsRules').delete(id).transaction.oncomplete = () => { loadSavingsRules(db); renderSavings(db); }; };
+
+    // --- ★ダッシュボード & グラフ ---
+    async function renderDashboardSummary(db) {
+      return new Promise(resolve => {
+        const tx = db.transaction(['ledgerEntries', 'sessions', 'rollRecords'], 'readonly');
+        let entries = [], sessions = [], rolls = [];
+        tx.objectStore('ledgerEntries').getAll().onsuccess = e => entries = e.target.result;
+        tx.objectStore('sessions').getAll().onsuccess = e => sessions = e.target.result;
+        tx.objectStore('rollRecords').getAll().onsuccess = e => rolls = e.target.result;
+
+        tx.oncomplete = () => {
+          const now = new Date();
+          const currentYear = now.getFullYear(), currentMonth = now.getMonth();
+          
+          let totalBal = 0, mBal = 0, mSav = 0, mExp = 0;
+          entries.forEach(e => {
+            const amt = e.type === 'saving' ? e.amount : -e.amount;
+            totalBal += amt;
+            const d = new Date(e.date);
+            if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
+              mBal += amt;
+              if (e.type === 'saving') mSav += e.amount;
+              else mExp += e.amount;
+            }
+          });
+
+          const mSessions = sessions.filter(s => {
+            if (!s.dateStart) return false;
+            const d = new Date(s.dateStart); return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+          });
+          const mSessionIds = mSessions.map(s => s.id);
+          const mRolls = rolls.filter(r => r.isJudgement && mSessionIds.includes(r.sessionId));
+
+          document.getElementById('total-balance').textContent = `${totalBal >= 0 ? '+' : ''}${totalBal.toLocaleString()}円`;
+          document.getElementById('month-balance').textContent = `${mBal >= 0 ? '+' : ''}${mBal.toLocaleString()}円`;
+          document.getElementById('month-savings').textContent = `+${mSav.toLocaleString()}円`;
+          document.getElementById('month-expenses').textContent = `-${mExp.toLocaleString()}円`;
+          document.getElementById('month-stats').textContent = `${mSessions.length}卓 / ${mRolls.length}回`;
+
+          // プログレスバーの更新
+          const totalMonthIO = mSav + mExp;
+          const savRatio = totalMonthIO > 0 ? (mSav / totalMonthIO) * 100 : 0;
+          document.getElementById('month-progress').style.width = `${savRatio}%`;
+
+          renderCalendar(entries, sessions, currentYear, currentMonth);
+          resolve();
+        };
+      });
+    }
+
+    document.getElementById('btn-add-manual').addEventListener('click', () => {
+      const date = document.getElementById('manual-date').value, type = document.getElementById('manual-type').value, label = document.getElementById('manual-label').value, amount = parseInt(document.getElementById('manual-amount').value, 10);
+      if (!date || !label || isNaN(amount)) return alert('正しく入力してください。');
+      db.transaction(['ledgerEntries'], 'readwrite').objectStore('ledgerEntries').add({ id: generateId(), date, type, label, amount, sessionId: null, details: [], createdAt: new Date().toISOString() }).transaction.oncomplete = () => { 
+        alert('記録しました'); 
+        document.getElementById('manual-label').value = ''; document.getElementById('manual-amount').value = '';
+        renderDashboardSummary(db); renderSavings(db);
+      };
+    });
+
+    // ★ 推し貯金風カレンダーの描画
+    function renderCalendar(entries, sessions, targetYear, targetMonth) {
+      const daily = {};
+      entries.forEach(en => {
+        const d = new Date(en.date);
+        if (d.getFullYear() === targetYear && d.getMonth() === targetMonth) {
+          const day = d.getDate();
+          if (!daily[day]) daily[day] = { saving: 0, expense: 0, images: [] };
+          daily[day][en.type] += en.amount;
+          
+          if (en.sessionId) {
+              const session = sessions.find(s => s.id === en.sessionId);
+              if (session && session.imageAssetId) daily[day].images.push(session.imageAssetId);
+          }
+        }
+      });
+      const days = new Date(targetYear, targetMonth + 1, 0).getDate();
+      
+      let html = `<div class="calendar-grid">`;
+      ['日', '月', '火', '水', '木', '金', '土'].forEach(w => html += `<div class="cal-header">${w}</div>`);
+      
+      const firstDay = new Date(targetYear, targetMonth, 1).getDay();
+      for(let i=0; i<firstDay; i++) html += `<div></div>`;
+      
+      for (let i = 1; i <= days; i++) {
+        const data = daily[i] || { saving: 0, expense: 0, images: [] };
+        const hasData = data.saving > 0 || data.expense > 0;
+        const imgStyle = data.images.length > 0 ? `background-image: url('${data.images[0]}');` : '';
+        const imgClass = data.images.length > 0 ? 'has-img' : '';
+        const dataClass = hasData ? 'has-data' : '';
+        const clickStr = hasData ? `onclick="showCalendarDetail('${targetYear}-${String(targetMonth+1).padStart(2,'0')}-${String(i).padStart(2,'0')}')"` : '';
+        
+        let amtsHtml = '';
+        if(data.saving > 0) amtsHtml += `<div class="cal-amt plus">+${data.saving.toLocaleString()}円</div>`;
+        if(data.expense > 0) amtsHtml += `<div class="cal-amt minus">-${data.expense.toLocaleString()}円</div>`;
+
+        html += `<div class="cal-day ${imgClass} ${dataClass}" style="${imgStyle}" ${clickStr}>
+            <div class="cal-date">${i}</div>
+            <div class="cal-amounts">${amtsHtml}</div>
+          </div>`;
+      }
+      document.getElementById('calendar-container').innerHTML = html + `</div>`;
+    }
+
+    window.showCalendarDetail = function(dateStr) {
+      const tx = db.transaction(['ledgerEntries', 'sessions'], 'readonly');
+      let entries = [], sessions = [];
+      tx.objectStore('ledgerEntries').getAll().onsuccess = ev => entries = ev.target.result.filter(x => x.date === dateStr);
+      tx.objectStore('sessions').getAll().onsuccess = ev => sessions = ev.target.result;
+      tx.oncomplete = () => {
+        let s = 0, ex = 0, h = '<h4>貯金</h4><ul>';
+        entries.filter(x=>x.type==='saving').forEach(x => { s+=x.amount; h+=`<li>${sessions.find(ss=>ss.id===x.sessionId)?.title || x.label}: <span style="color:var(--success);">+${x.amount}円</span></li>`; });
+        h += '</ul><h4>支出</h4><ul>';
+        entries.filter(x=>x.type==='expense').forEach(x => { ex+=x.amount; h+=`<li>${x.label}: <span style="color:var(--danger);">-${x.amount}円</span></li>`; });
+        document.getElementById('calendar-detail-date').textContent = dateStr;
+        document.getElementById('calendar-detail-content').innerHTML = h + `</ul><hr><p style="font-size:1.2em; font-weight:bold;">収支: ${s-ex>=0?'+':''}${s-ex}円</p>`;
+        document.getElementById('calendar-detail-modal-wrapper').classList.remove('hidden');
+      };
+    };
+
+    // --- Analysis ---
+    const SUCCESS_RESULTS = ['critical', 'special', 'success', 'hard', 'extreme'], FAILURE_RESULTS = ['failure', 'fumble'];
+    function calculateStats(judgements) {
+      let successCount = 0, critCount = 0, fumbleCount = 0, exact1Count = 0, exact100Count = 0;
+      judgements.forEach(r => {
+        if (SUCCESS_RESULTS.includes(r.result)) successCount++;
+        if (r.result === 'critical') critCount++;
+        if (r.result === 'fumble') fumbleCount++;
+        if (r.isExact1) exact1Count++;
+        if (r.isExact100) exact100Count++;
+      });
+      const t = judgements.length;
+      return { total: t, successRate: t ? (successCount/t)*100 : 0, critRate: t ? (critCount/t)*100 : 0, fumbleRate: t ? (fumbleCount/t)*100 : 0, exact1Count, exact100Count, successCount };
+    }
+    
+    async function renderOverallAnalysis(db) {
+      return new Promise(resolve => {
+        const tx = db.transaction(['rollRecords', 'sessions', 'pcs', 'aliasMappings'], 'readonly');
+        let rolls = [], sessions = [], pcs = [], aliases = [];
+        tx.objectStore('rollRecords').getAll().onsuccess = e => rolls = e.target.result;
+        tx.objectStore('sessions').getAll().onsuccess = e => sessions = e.target.result;
+        tx.objectStore('pcs').getAll().onsuccess = e => pcs = e.target.result;
+        tx.objectStore('aliasMappings').getAll().onsuccess = e => aliases = e.target.result;
+        
+        tx.oncomplete = () => {
+          const judgements = rolls.filter(r => r.isJudgement && r.result !== 'unknown');
+          const stats = calculateStats(judgements);
+          
+          if (judgements.length === 0) {
+            document.getElementById('analysis-content').innerHTML = '<div class="card">分析できるダイス判定データがありません。</div>';
+            return resolve();
+          }
+
+          let html = `<div class="card" style="display:flex; gap: 20px; justify-content: space-between; flex-wrap: wrap;">
+            <div><p style="margin:0; color:#94a3b8; font-size:0.9em;">総セッション数</p><h2>${sessions.length}</h2></div>
+            <div><p style="margin:0; color:#94a3b8; font-size:0.9em;">総判定数</p><h2>${stats.total}</h2></div>
+            <div><p style="margin:0; color:#94a3b8; font-size:0.9em;">全体成功率</p><h2 style="color:var(--success);">${stats.successRate.toFixed(1)}%</h2></div>
+            <div><p style="margin:0; color:#94a3b8; font-size:0.9em;">クリティカル率</p><h2 style="color:#fcd34d;">${stats.critRate.toFixed(1)}%</h2></div>
+            <div><p style="margin:0; color:#94a3b8; font-size:0.9em;">ファンブル率</p><h2 style="color:var(--danger);">${stats.fumbleRate.toFixed(1)}%</h2></div>
+          </div>`;
+          
+          const aliasDict = {};
+          aliases.forEach(a => aliasDict[a.rawNameNormalized] = a.pcId);
+          
+          const pcStats = {};
+          judgements.forEach(r => {
+            const pcId = aliasDict[normalizeName(r.rawSpeaker)];
+            if (pcId) {
+              if (!pcStats[pcId]) pcStats[pcId] = { id: pcId, rolls: [] };
+              pcStats[pcId].rolls.push(r);
+            }
+          });
+
+          html += `<h3>PC別 分析</h3><table><tr><th>PC名</th><th>判定数</th><th>成功率</th><th>クリ率</th><th>F率</th></tr>`;
+          Object.values(pcStats).sort((a,b) => b.rolls.length - a.rolls.length).forEach(ps => {
+            const s = calculateStats(ps.rolls), pc = pcs.find(p => p.id === ps.id);
+            html += `<tr><td><strong style="color:var(--accent-color);">${pc ? pc.name : '不明'}</strong></td><td>${s.total}</td><td>${s.successRate.toFixed(1)}%</td><td>${s.critRate.toFixed(1)}%</td><td>${s.fumbleRate.toFixed(1)}%</td></tr>`;
+          });
+          document.getElementById('analysis-content').innerHTML = html + `</table>`;
+          resolve();
+        };
+      });
+    }
+
+    // --- ★ リッチなSavings Engine ---
+    async function renderSavings(db) {
+      return new Promise(resolve => {
+        const tx = db.transaction(['rollRecords', 'pcs', 'aliasMappings', 'sessions', 'savingsRules', 'ledgerEntries'], 'readonly');
+        let rolls = [], pcs = [], aliases = [], sessions = [], rules = [], ledger = [];
+        tx.objectStore('rollRecords').getAll().onsuccess = e => rolls = e.target.result;
+        tx.objectStore('pcs').getAll().onsuccess = e => pcs = e.target.result;
+        tx.objectStore('aliasMappings').getAll().onsuccess = e => aliases = e.target.result;
+        tx.objectStore('sessions').getAll().onsuccess = e => sessions = e.target.result;
+        tx.objectStore('savingsRules').getAll().onsuccess = e => rules = e.target.result;
+        tx.objectStore('ledgerEntries').getAll().onsuccess = e => ledger = e.target.result;
+        
+        tx.oncomplete = () => {
+          // ★ 履歴リストの描画 (画像3風のリストUI)
+          const hDiv = document.getElementById('savings-history-container');
+          if (ledger.length === 0) {
+            hDiv.innerHTML = '<p style="color:#94a3b8;">履歴はまだありません。</p>';
+          } else {
+            const sorted = [...ledger].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).reverse().slice(0, 50);
+            let html = `<div class="history-list">`;
+            sorted.forEach(e => {
+               const isSav = e.type === 'saving';
+               const iconObj = isSav ? '🐖' : '🛒';
+               const colorClass = isSav ? 'plus' : 'minus';
+               const sign = isSav ? '+' : '-';
+               const session = sessions.find(s => s.id === e.sessionId);
+               const label = e.label === '自動計算貯金' && session ? session.title : e.label;
+               
+               html += `
+                 <div class="history-item">
+                   <div class="hist-icon-wrap ${isSav ? '' : 'expense'}">${iconObj}</div>
+                   <div class="hist-info">
+                     <div class="hist-title">${label}</div>
+                     <div class="hist-sub">${e.date}</div>
+                   </div>
+                   <div class="hist-right">
+                     <div class="hist-amount ${colorClass}">${sign}¥${e.amount.toLocaleString()}</div>
+                     <button class="outline" style="padding:4px 8px; font-size:0.8em;" onclick="openLedgerDetail('${e.id}')">詳細</button>
+                     <button class="danger" style="padding:4px 8px; font-size:0.8em;" onclick="deleteLedgerEntry('${e.id}')">取消</button>
+                   </div>
+                 </div>`;
+            });
+            hDiv.innerHTML = html + `</div>`;
+            window._currentLedgers = sorted;
+          }
+
+          if (!myPlId) {
+            document.getElementById('savings-candidates-container').innerHTML = '<div class="help-text">自分のPLが設定されていません。設定タブから自分のPLを選択してください。</div>';
+            return resolve();
+          }
+
+          const savedCombos = new Set();
+          ledger.forEach(entry => {
+            if (entry.details) entry.details.forEach(d => { if (d.rollId && d.ruleId) savedCombos.add(d.rollId + '_' + d.ruleId); });
+          });
+
+          const aliasDict = {};
+          aliases.forEach(a => aliasDict[a.rawNameNormalized] = a.pcId);
+          
+          const candidatesBySession = {};
+          
+          rolls.filter(r => r.isJudgement && r.result !== 'unknown').forEach(r => {
+            const pcId = aliasDict[normalizeName(r.rawSpeaker)];
+            if (!pcId) return;
+            const pc = pcs.find(p => p.id === pcId);
+            if (!pc || pc.plId !== myPlId || pc.excludedFromSavings) return;
+
+            rules.filter(ru => ru.isEnabled).forEach(rule => {
+              if (savedCombos.has(r.id + '_' + rule.id)) return;
+              if (rule.condition.exactRolls && rule.condition.exactRolls.length > 0 && !rule.condition.exactRolls.includes(r.rolledValue)) return;
+              if (rule.condition.result && rule.condition.result.length > 0 && !rule.condition.result.includes(r.result)) return;
+              
+              if (!candidatesBySession[r.sessionId]) candidatesBySession[r.sessionId] = [];
+              candidatesBySession[r.sessionId].push({ 
+                id: generateId(), sessionId: r.sessionId, rollId: r.id, ruleId: rule.id,       
+                ruleNameSnapshot: rule.name, amount: rule.amount, skill: r.skillRaw, targetValue: r.targetValue, rolledValue: r.rolledValue, result: r.result 
+              });
+            });
+          });
+
+          const cDiv = document.getElementById('savings-candidates-container');
+          cDiv.innerHTML = '';
+
+          const sessionIds = Object.keys(candidatesBySession);
+          if (sessionIds.length === 0) {
+            cDiv.innerHTML = '<div class="card">現在、自動判定による未確定の貯金候補はありません。</div>';
+            return resolve();
+          }
+
+          sessionIds.forEach(sId => {
+            const sessionCands = candidatesBySession[sId];
+            const session = sessions.find(s => s.id === sId);
+            const sTitle = session ? session.title : '不明なシナリオ';
+            const sTotal = sessionCands.reduce((sum, c) => sum + c.amount, 0);
+            
+            const groupDiv = document.createElement('div');
+            groupDiv.style = "background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 16px; margin-bottom: 20px; overflow: hidden;";
+            
+            let listHtml = '';
+            sessionCands.forEach(c => {
+               listHtml += `
+                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                   <label style="display:flex; align-items:center; gap:15px; cursor:pointer;">
+                     <input type="checkbox" checked class="cand-check-${sId}" data-amount="${c.amount}" data-id="${c.id}"> 
+                     <span style="font-weight:bold;">${c.ruleNameSnapshot}</span>
+                   </label>
+                   <div style="text-align: right;">
+                     <strong style="color:var(--success); font-size:1.1em;">+¥${c.amount}</strong>
+                     <div style="font-size:0.8em; color:#94a3b8;">【${c.skill||'-'}】 出目:${c.rolledValue} [${c.result}]</div>
+                   </div>
+                 </div>`;
+            });
+
+            groupDiv.innerHTML = `
+              <div style="background: var(--card-bg); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color);">
+                <h3 style="margin: 0;">${sTitle}</h3>
+                <span style="color:var(--success); font-weight:bold; font-size:1.2em;" id="total-${sId}">+¥${sTotal.toLocaleString()}</span>
+              </div>
+              <div>
+                ${listHtml}
+                <div style="padding: 15px;"><button style="width: 100%;" onclick="confirmSessionSavings('${sId}')">このシナリオの貯金を確定する</button></div>
+              </div>
+            `;
+            
+            groupDiv.addEventListener('change', e => {
+              if (e.target.classList.contains(`cand-check-${sId}`)) {
+                const checked = Array.from(groupDiv.querySelectorAll(`.cand-check-${sId}:checked`));
+                const newTotal = checked.reduce((sum, chk) => sum + parseInt(chk.dataset.amount, 10), 0);
+                groupDiv.querySelector(`#total-${sId}`).textContent = `+¥${newTotal.toLocaleString()}`;
+              }
+            });
+            cDiv.appendChild(groupDiv);
+            if(!window._sessionCandidates) window._sessionCandidates = {};
+            window._sessionCandidates[sId] = sessionCands;
+          });
+          resolve();
+        };
+      });
+    }
+
+    window.confirmSessionSavings = function(sId) {
+      const checkedIds = Array.from(document.querySelectorAll(`.cand-check-${sId}:checked`)).map(cb => cb.dataset.id);
+      const valid = window._sessionCandidates[sId].filter(c => checkedIds.includes(c.id));
+      if (!valid.length) return alert('選択されていません');
+      const total = valid.reduce((s,c)=>s+c.amount,0);
+      if (!confirm(`合計 +${total}円を確定しますか？`)) return;
+      
+      db.transaction(['ledgerEntries'], 'readwrite').objectStore('ledgerEntries').add({ 
+        id: generateId(), date: new Date().toISOString().split('T')[0], type: 'saving', label: '自動計算貯金', amount: total, sessionId: sId, details: valid, createdAt: new Date().toISOString() 
+      }).transaction.oncomplete = () => { 
+        alert('保存しました'); renderDashboardSummary(db); renderSavings(db);
+      };
+    };
+
+    window.openLedgerDetail = function(ledgerId) {
+      const entry = window._currentLedgers.find(e => e.id === ledgerId);
+      if (!entry || !entry.details) return;
+      
+      let html = '';
+      entry.details.forEach(d => {
+         html += `<div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,0.05); padding:15px 0;">
+             <div><strong>${d.ruleNameSnapshot || d.note}</strong><div style="font-size:0.85em; color:#94a3b8; margin-top:4px;">【${d.skill||'-'}】 目標:${d.targetValue||d.target||'-'} 出目:${d.rolledValue||d.roll||'-'} [${d.result||'-'}]</div></div>
+             <strong style="color:var(--success); font-size:1.1em;">+¥${d.amount}</strong></div>`;
+      });
+      document.getElementById('ledger-detail-info').textContent = `${entry.date} / ${entry.label} / 合計: +¥${entry.amount}`;
+      document.getElementById('ledger-detail-list').innerHTML = html;
+      document.getElementById('ledger-detail-modal-wrapper').classList.remove('hidden');
+    };
+
+    window.deleteLedgerEntry = function(id) {
+      if (!confirm('この履歴を取り消しますか？\n自動計算分だった場合、再び未確定の候補として表示されます。')) return;
+      db.transaction(['ledgerEntries'], 'readwrite').objectStore('ledgerEntries').delete(id).transaction.oncomplete = () => { renderDashboardSummary(db); renderSavings(db); };
+    };
+
+    // --- Navigation & Core Events ---
+    document.getElementById('nav-menu').addEventListener('click', e => {
+      const li = e.target.closest('li');
+      if (li) {
+        document.querySelectorAll('#nav-menu li').forEach(el => el.classList.remove('active'));
+        li.classList.add('active');
+        document.querySelectorAll('main section').forEach(sec => sec.classList.add('hidden'));
+        document.getElementById(li.dataset.target).classList.remove('hidden');
+        
+        const target = li.dataset.target;
+        if (target === 'analysis') renderOverallAnalysis(db);
+        if (target === 'savings') renderSavings(db);
+        if (target === 'logs') renderSessionList(db);
+        if (target === 'settings') loadSavingsRules(db);
+        if (target === 'all-logs') renderAllDiceLogs(db);
+      }
+    });
+
+    document.getElementById('log-upload').addEventListener('change', async e => {
+      if(e.target.files.length === 0) return;
+      let successCount = 0; let skipCount = 0;
+      for (const file of e.target.files) {
+        try { await saveLogToDB(db, await handleFileUpload(file, db)); successCount++; } 
+        catch (err) { skipCount++; }
+      }
+      e.target.value = "";
+      await renderDashboardSummary(db); await loadPeopleData(db); await renderSessionList(db);
+      if(successCount > 0) {
+        alert(`${successCount}件のログを取り込みました。（スキップ: ${skipCount}件）\n「人物・名前整理」タブでPCの紐付けを行ってください。`);
+        document.querySelector('li[data-target="people"]').click();
+      } else { alert(`新しいログは取り込まれませんでした。（スキップ: ${skipCount}件）`); }
+    });
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      document.getElementById('manual-date').value = new Date().toISOString().split('T')[0];
+      await initDB(); 
+      await renderDashboardSummary(db); 
+      await loadPeopleData(db);
+      await renderOverallAnalysis(db);
+      await renderSavings(db);
+      await renderSessionList(db);
+
+      linkDropdownCtrl = initSearchableDropdown('link-pc-dropdown', 'link-pc-pl', () => activeAliasNames.length > 0 ? activeAliasNames[0] : "");
+      editDropdownCtrl = initSearchableDropdown('edit-pc-dropdown', 'edit-pc-pl', () => editingAliasName);
+    });
+  </script>
+</body>
+</html>

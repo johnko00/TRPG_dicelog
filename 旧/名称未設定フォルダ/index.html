@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>TRPG LOG & BANK</title>
+  <style>
+    :root { --bg-color: #1e1e1e; --text-color: #e0e0e0; --accent-color: #4CAF50; --nav-bg: #2d2d2d; }
+    body { margin: 0; font-family: sans-serif; background: var(--bg-color); color: var(--text-color); display: flex; height: 100vh; }
+    nav { width: 250px; background: var(--nav-bg); padding: 20px; overflow-y: auto; }
+    nav ul { list-style: none; padding: 0; }
+    nav li { padding: 12px 0; cursor: pointer; border-bottom: 1px solid #444; }
+    nav li:hover { color: var(--accent-color); }
+    main { flex: 1; padding: 20px; overflow-y: auto; }
+    .hidden { display: none !important; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #555; padding: 8px; text-align: left; }
+    th { background: var(--nav-bg); }
+    button { padding: 5px 10px; cursor: pointer; background: #333; color: #fff; border: 1px solid #555; border-radius: 3px; }
+    button:hover { background: #555; }
+    input, select { padding: 5px; background: #333; color: #fff; border: 1px solid #555; }
+    .modal { position: fixed; top: 10%; left: 50%; transform: translateX(-50%); background: #222; padding: 20px; border: 1px solid #777; z-index: 1000; max-height: 80vh; overflow-y: auto; width: 400px; max-width: 90%; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+  </style>
+</head>
+<body>
+  <nav>
+    <h2>TRPG BANK</h2>
+    <ul id="nav-menu">
+      <li data-target="dashboard">🏠 ダッシュボード</li>
+      <li data-target="logs">🎲 ログ</li>
+      <li data-target="people">👥 人物・名前整理</li>
+      <li data-target="analysis">📊 分析</li>
+      <li data-target="savings">💰 TRPG貯金</li>
+      <li data-target="settings">⚙ 設定</li>
+    </ul>
+  </nav>
+
+  <main id="app-content">
+    <section id="dashboard">
+      <h1>ダッシュボード</h1>
+      <p style="font-size: 1.2em;">現在の貯金残高: <strong id="total-balance" style="color: var(--accent-color);">計算中...</strong></p>
+      <div id="calendar-container"></div>
+    </section>
+    
+    <section id="logs" class="hidden">
+      <h1>ログ管理</h1>
+      <input type="file" id="log-upload" accept=".html" multiple>
+      <div id="session-table-container"></div>
+    </section>
+    
+    <section id="people" class="hidden">
+      <h1>人物・名前整理</h1>
+      <button id="btn-create-pc">＋ 新規PC作成</button>
+      <table>
+        <thead><tr><th>ログ上の名前</th><th>状態</th><th>正式PC</th><th>PL</th><th>PCタイプ</th><th>操作</th></tr></thead>
+        <tbody id="people-table-body"></tbody>
+      </table>
+    </section>
+    
+    <section id="analysis" class="hidden">
+      <h1>分析</h1>
+      <div id="analysis-content"></div>
+    </section>
+    
+    <section id="savings" class="hidden">
+      <h1>TRPG貯金</h1>
+      <div style="background: #2a2a2a; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+        <h3>手動貯金 / 支出の追加</h3>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <input type="date" id="manual-date" required>
+          <select id="manual-type"><option value="saving">貯金 (+)</option><option value="expense">支出 (-)</option></select>
+          <input type="text" id="manual-label" placeholder="項目名 (例: 感謝 神)" required>
+          <input type="number" id="manual-amount" placeholder="金額 (円)" min="1" required>
+          <button id="btn-add-manual">追加</button>
+        </div>
+      </div>
+      <div id="savings-candidates-container"></div>
+    </section>
+    
+    <section id="settings" class="hidden"></section>
+  </main>
+
+  <div id="link-modal" class="modal hidden">
+    <h3>紐付け設定</h3>
+    <p>対象: <span id="link-target-name"></span></p>
+    <select id="pc-select" style="width: 100%; margin-bottom: 10px;"><option value="">-- PCを選択 --</option></select>
+    <button id="btn-save-link">保存</button>
+    <button onclick="document.getElementById('link-modal').classList.add('hidden')">キャンセル</button>
+  </div>
+
+  <div id="pc-edit-modal" class="modal hidden">
+    <h2>PC情報編集</h2>
+    <p>対象PC: <strong id="edit-pc-name-display"></strong></p>
+    <label style="display:block; margin-bottom:10px;">PCタイプ:
+      <select id="edit-pc-type"><option value="PC">PC</option><option value="KPC">KPC</option><option value="NPC">NPC</option><option value="KP">KP</option><option value="other">その他</option></select>
+    </label>
+    <label style="display:block; margin-bottom:15px;">
+      <input type="checkbox" id="edit-pc-excluded"> 貯金対象から除外する
+    </label>
+    <button id="btn-save-pc-info">保存</button>
+    <button onclick="document.getElementById('pc-edit-modal').classList.add('hidden')">キャンセル</button>
+  </div>
+
+  <div id="session-edit-modal" class="modal hidden">
+    <h2>セッション編集</h2>
+    <label style="display:block; margin-bottom:10px;">タイトル: <input type="text" id="edit-session-title" style="width: 100%;"></label>
+    <label style="display:block; margin-bottom:10px;">日付: <input type="date" id="edit-session-date"></label>
+    <label style="display:block; margin-bottom:10px;">代表画像: <input type="file" id="edit-session-image" accept="image/*"></label>
+    <img id="edit-session-preview" style="max-width: 100%; max-height: 200px; display: none; margin-bottom: 10px;" />
+    <button id="btn-save-session">保存</button>
+    <button onclick="document.getElementById('session-edit-modal').classList.add('hidden')">キャンセル</button>
+  </div>
+
+  <div id="calendar-detail-modal" class="modal hidden">
+    <h3 id="calendar-detail-date"></h3>
+    <div id="calendar-detail-content" style="margin-bottom: 15px;"></div>
+    <button onclick="document.getElementById('calendar-detail-modal').classList.add('hidden')">閉じる</button>
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
