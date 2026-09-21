@@ -1,0 +1,9 @@
+{
+  "name": "trpg-log-bank",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local-first TRPG LOG & BANK parser foundation",
+  "scripts": {
+    "test": "node --test tests/parser.test.js"
+  }
+}

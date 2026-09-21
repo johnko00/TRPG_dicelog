@@ -307,6 +307,7 @@
   <div id="ledger-detail-modal-wrapper" class="modal-overlay hidden"><div class="modal large"><h2>履歴の詳細</h2><p style="color: #94a3b8; margin-bottom: 15px;" id="ledger-detail-info"></p><div id="ledger-detail-list" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; max-height: 400px; overflow-y: auto;"></div><div style="display: flex; justify-content: flex-end; margin-top: 20px;"><button class="outline" onclick="document.getElementById('ledger-detail-modal-wrapper').classList.add('hidden')">閉じる</button></div></div></div>
   <div id="calendar-detail-modal-wrapper" class="modal-overlay hidden"><div class="modal large"><h2 id="calendar-detail-date">日付詳細</h2><div id="calendar-detail-content" style="line-height:1.7;"></div><div style="display:flex; justify-content:flex-end; margin-top:20px;"><button class="outline" onclick="document.getElementById('calendar-detail-modal-wrapper').classList.add('hidden')">閉じる</button></div></div></div>
 
+  <script src="src/parser.js"></script>
   <script>
     // --- クイック入力設定 ---
     function setManualData(label, amount, type, icon) {
@@ -413,58 +414,11 @@
 
     // --- Parser & File Upload ---
     function analyzeMessageData(item) {
-      const text = item.body;
-      const statusMatch = text.match(/(SAN|HP|MP|C)\s*:\s*(\d+)\s*(?:→|->|＞)\s*(\d+)/i);
-      if (statusMatch) {
-        item.itemType = 'status';
-        item.statusData = { stat: statusMatch[1].toUpperCase(), before: parseInt(statusMatch[2], 10), after: parseInt(statusMatch[3], 10), delta: parseInt(statusMatch[3], 10) - parseInt(statusMatch[2], 10) };
-        return item;
-      }
-      const rollParts = text.split('＞').map(s => s.trim());
-      const commandPart = rollParts[0];
-      const isDiceBot = /\d+[dD]\d+/i.test(commandPart) || /(CCB|CC<=|choice|sanc|res|CBR)/i.test(commandPart);
-
-      if (text.includes('＞') && isDiceBot) {
-        item.itemType = 'roll';
-        item.rollData = { system: 'unknown', result: 'unknown', rolledValue: null, targetValue: null, skillRaw: '' };
-        const resultPart = rollParts[rollParts.length - 1];
-        const targetMatch = commandPart.match(/\(1D100<=(\d+)\)/i);
-        if (targetMatch) item.rollData.targetValue = parseInt(targetMatch[1], 10);
-        const skillMatch = commandPart.match(/【(.*?)】|\s+([^\s\d\(\)]+)\s+\(1D100/);
-        if (skillMatch) item.rollData.skillRaw = (skillMatch[1] || skillMatch[2]).trim();
-        
-        if (commandPart.match(/^(CCB|1d100|1D100)/)) {
-          item.rollData.system = 'CoC6';
-          if (resultPart.match(/決定的成功|クリティカル/)) item.rollData.result = 'critical';
-          else if (resultPart.match(/致命的失敗|ファンブル/)) item.rollData.result = 'fumble';
-          else if (resultPart.includes('スペシャル')) item.rollData.result = 'special';
-          else if (resultPart.includes('成功')) item.rollData.result = 'success';
-          else if (resultPart.includes('失敗')) item.rollData.result = 'failure';
-        } else if (commandPart.startsWith('CC<=')) {
-          item.rollData.system = 'CoC7';
-          if (resultPart.includes('クリティカル')) item.rollData.result = 'critical';
-          else if (resultPart.includes('ファンブル')) item.rollData.result = 'fumble';
-          else if (resultPart.includes('イクストリーム')) item.rollData.result = 'extreme';
-          else if (resultPart.includes('ハード')) item.rollData.result = 'hard';
-          else if (resultPart.match(/レギュラー|成功/)) item.rollData.result = 'success';
-          else if (resultPart.includes('失敗')) item.rollData.result = 'failure';
-        }
-        const rolledMatch = rollParts.slice(1, -1).reverse().find(s => !isNaN(parseInt(s, 10)));
-        if (rolledMatch) item.rollData.rolledValue = parseInt(rolledMatch, 10);
-      } else { item.itemType = 'message'; }
-      return item;
+      return TRPGParser.parseMessage(item);
     }
 
     function parseCcfoliaHtml(htmlString) {
-      const doc = new DOMParser().parseFromString(htmlString, 'text/html');
-      const items = [];
-      doc.querySelectorAll('p').forEach((p, index) => {
-        const spans = p.querySelectorAll('span');
-        if (spans.length >= 3) {
-          items.push(analyzeMessageData({ sequence: index + 1, channel: spans[0].textContent.trim(), rawSpeaker: spans[1].textContent.trim(), body: Array.from(spans).slice(2).map(s => s.textContent).join(' ').trim(), rawText: p.textContent.trim(), itemType: 'unknown' }));
-        }
-      });
-      return items;
+      return TRPGParser.parseCcfoliaHtml(htmlString);
     }
 
     async function handleFileUpload(file, db) {
@@ -484,15 +438,21 @@
         const sessionId = generateId(), sourceLogId = generateId();
         
         tx.objectStore('sessions').add({ id: sessionId, title: parsedData.fileName.replace(/\.html$/i, ''), dateStart: new Date().toISOString().split('T')[0], dateEnd: null, systemHints: [], sourceLogIds: [sourceLogId], imageAssetId: null, memo: '', tags: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-        tx.objectStore('sourceLogs').add({ id: sourceLogId, sessionId, fileName: parsedData.fileName, fileHash: parsedData.fileHash, rawHtml: parsedData.rawHtml, importedAt: new Date().toISOString(), byteSize: new Blob([parsedData.rawHtml]).size, channelHint: null, sourceType: "ccfolia-html", parseVersion: 1 });
+        tx.objectStore('sourceLogs').add({ id: sourceLogId, sessionId, fileName: parsedData.fileName, fileHash: parsedData.fileHash, rawHtml: parsedData.rawHtml, importedAt: new Date().toISOString(), byteSize: new Blob([parsedData.rawHtml]).size, channelHint: null, sourceType: "ccfolia-html", parseVersion: TRPGParser.PARSER_VERSION, parserVersion: TRPGParser.PARSER_VERSION });
 
         const uniqueNames = new Set();
         parsedData.parsedItems.forEach(item => {
           item.id = generateId(); item.sourceLogId = sourceLogId; item.sessionId = sessionId;
           if (item.itemType === 'roll') {
             uniqueNames.add(item.rawSpeaker);
+            const rollEntries = item.rollData.rolls || [item.rollData];
             item.rollId = generateId();
-            tx.objectStore('rollRecords').add({ id: item.rollId, parsedItemId: item.id, sessionId, sourceLogId, system: item.rollData.system, rawSpeaker: item.rawSpeaker, pcId: null, plId: null, rawCommand: item.body.split('＞')[0].trim(), skillRaw: item.rollData.skillRaw, skillCanonical: null, skillCategory: null, targetRaw: item.rollData.targetValue ? item.rollData.targetValue.toString() : null, targetValue: item.rollData.targetValue, rolledValue: item.rollData.rolledValue, result: item.rollData.result, resultRaw: item.body.split('＞').pop().trim(), bonusPenalty: null, difficulty: null, isJudgement: item.rollData.result !== 'unknown', isSanCheck: item.rollData.skillRaw.includes('正気度'), isExact1: item.rollData.rolledValue === 1, isExact100: item.rollData.rolledValue === 100, sequenceInSession: item.sequence });
+            rollEntries.forEach((rollData, rollIndex) => {
+              const rollId = rollIndex === 0 ? item.rollId : generateId();
+              tx.objectStore('rollRecords').add({ id: rollId, parsedItemId: item.id, sessionId, sourceLogId, parserVersion: TRPGParser.PARSER_VERSION, system: rollData.system, rawSpeaker: item.rawSpeaker, pcId: null, plId: null, rawCommand: item.body.split('＞')[0].trim(), skillRaw: rollData.skillRaw, skillCanonical: null, skillCategory: null, targetRaw: rollData.targetRaw, targetValue: rollData.targetValue, rolledValue: rollData.rolledValue, result: rollData.result, normalizedResult: rollData.normalizedResult, nativeResult: rollData.nativeResult, resultRaw: rollData.resultRaw, bonusPenalty: rollData.bonusPenalty, difficulty: rollData.difficulty, isJudgement: rollData.isJudgement, isSanCheck: rollData.skillRaw.includes('正気度'), isExact1: rollData.rolledValue === 1, isExact100: rollData.rolledValue === 100, rollIndex, sequenceInSession: item.sequence });
+            });
+          } else if (item.itemType === 'status') {
+            tx.objectStore('statusChanges').add({ id: generateId(), parsedItemId: item.id, sessionId, sourceLogId, parserVersion: TRPGParser.PARSER_VERSION, rawSpeaker: item.rawSpeaker, speaker: item.statusData.speaker, statusName: item.statusData.statusName, stat: item.statusData.stat, before: item.statusData.before, after: item.statusData.after, delta: item.statusData.delta, rawText: item.rawText, sequenceInSession: item.sequence });
           }
           tx.objectStore('parsedItems').add(item);
         });

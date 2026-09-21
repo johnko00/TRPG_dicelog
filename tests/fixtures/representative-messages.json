@@ -1,0 +1,20 @@
+[
+  {"channel":"[main]","rawSpeaker":"探索者A","body":"CCB<=60 【聞き耳】 (1D100<=60) ＞ 19 ＞ 成功"},
+  {"channel":"[main]","rawSpeaker":"探索者A","body":"CCB<=75 【目星】 (1D100<=75) ＞ 9 ＞ スペシャル"},
+  {"channel":"[main]","rawSpeaker":"探索者A","body":"CCB<=75 【拳銃】 (1D100<=75) ＞ 4 ＞ 決定的成功/スペシャル"},
+  {"channel":"[main]","rawSpeaker":"探索者A","body":"CCB<=70 【目星】 (1D100<=70) ＞ 99 ＞ 致命的失敗"},
+  {"channel":"[main]","rawSpeaker":"探索者A","body":"CCB<=14*5 【DEX × 5】 (1D100<=70) ＞ 10 ＞ スペシャル"},
+  {"channel":"[main]","rawSpeaker":"探索者A","body":"CCB<=45/2 【知識】 (1D100<=22) ＞ 93 ＞ 失敗"},
+  {"channel":"[main]","rawSpeaker":"探索者B","body":"CC<=50 聞き耳\n(1D100<=50)\nボーナス・ペナルティダイス[0]\n＞ 71 ＞ 71 ＞ 失敗"},
+  {"channel":"[main]","rawSpeaker":"探索者B","body":"CC<=31 医学\n(1D100<=31)\nボーナス・ペナルティダイス[0]\n＞ 27 ＞ 27 ＞ レギュラー成功"},
+  {"channel":"[main]","rawSpeaker":"探索者B","body":"CC1<=50 目星\n(1D100<=50)\nボーナス・ペナルティダイス[1]\n＞ 44, 54 ＞ 44 ＞ レギュラー成功"},
+  {"channel":"[main]","rawSpeaker":"探索者B","body":"CC-1<=50 目星\n(1D100<=50)\nボーナス・ペナルティダイス[-1]\n＞ 3, 93 ＞ 93 ＞ 失敗"},
+  {"channel":"[main]","rawSpeaker":"探索者B","body":"CC<=50h 目星\n(1D100<=25)\n＞ 73 ＞ 73 ＞ 失敗"},
+  {"channel":"[main]","rawSpeaker":"探索者B","body":"CC<=50e 目星\n(1D100<=10)\n＞ 13 ＞ 13 ＞ 失敗"},
+  {"channel":"[info]","rawSpeaker":"system","body":"1d100<=87 【正気度ロール】\n(1D100<=87)\n＞ 39 ＞ 成功"},
+  {"channel":"[main]","rawSpeaker":"探索者A","body":"1D100 (1D100) ＞ 17"},
+  {"channel":"[info]","rawSpeaker":"system","body":"[ 真壁 凌 ] SAN : 87 → 86"},
+  {"channel":"[info]","rawSpeaker":"system","body":"[ 立川　真白 ] HP : 5 → 4"},
+  {"channel":"[info]","rawSpeaker":"system","body":"[ 谷川桂樹 ] MP : 11 → 13"},
+  {"channel":"[other]","rawSpeaker":"探索者A","body":"これは解析対象外のメッセージ"}
+]
