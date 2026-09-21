@@ -427,7 +427,8 @@
       return new Promise((resolve, reject) => {
         db.transaction(['sourceLogs'], 'readonly').objectStore('sourceLogs').index('fileHash').get(fileHash).onsuccess = async e => {
           if (e.target.result) return reject(new Error(`「${file.name}」は既に取り込まれています。`));
-          resolve({ fileName: file.name, fileHash, rawHtml: await file.text(), parsedItems: parseCcfoliaHtml(await file.text()) });
+          const rawHtml = await file.text();
+          resolve({ fileName: file.name, fileHash, rawHtml, parsedItems: parseCcfoliaHtml(rawHtml) });
         };
       });
     }
@@ -446,13 +447,14 @@
           if (item.itemType === 'roll') {
             uniqueNames.add(item.rawSpeaker);
             const rollEntries = item.rollData.rolls || [item.rollData];
-            item.rollId = generateId();
+            item.rollIds = [];
             rollEntries.forEach((rollData, rollIndex) => {
-              const rollId = rollIndex === 0 ? item.rollId : generateId();
-              tx.objectStore('rollRecords').add({ id: rollId, parsedItemId: item.id, sessionId, sourceLogId, parserVersion: TRPGParser.PARSER_VERSION, system: rollData.system, rawSpeaker: item.rawSpeaker, pcId: null, plId: null, rawCommand: item.body.split('＞')[0].trim(), skillRaw: rollData.skillRaw, skillCanonical: null, skillCategory: null, targetRaw: rollData.targetRaw, targetValue: rollData.targetValue, rolledValue: rollData.rolledValue, result: rollData.result, normalizedResult: rollData.normalizedResult, nativeResult: rollData.nativeResult, resultRaw: rollData.resultRaw, bonusPenalty: rollData.bonusPenalty, difficulty: rollData.difficulty, isJudgement: rollData.isJudgement, isSanCheck: rollData.skillRaw.includes('正気度'), isExact1: rollData.rolledValue === 1, isExact100: rollData.rolledValue === 100, rollIndex, sequenceInSession: item.sequence });
+              const rollId = generateId();
+              item.rollIds.push(rollId);
+              tx.objectStore('rollRecords').add(TRPGParser.buildRollRecord(item, rollData, { id: rollId, parsedItemId: item.id, sessionId, sourceLogId, parserVersion: TRPGParser.PARSER_VERSION, rollIndex }));
             });
           } else if (item.itemType === 'status') {
-            tx.objectStore('statusChanges').add({ id: generateId(), parsedItemId: item.id, sessionId, sourceLogId, parserVersion: TRPGParser.PARSER_VERSION, rawSpeaker: item.rawSpeaker, speaker: item.statusData.speaker, statusName: item.statusData.statusName, stat: item.statusData.stat, before: item.statusData.before, after: item.statusData.after, delta: item.statusData.delta, rawText: item.rawText, sequenceInSession: item.sequence });
+            tx.objectStore('statusChanges').add(TRPGParser.buildStatusChangeRecord(item, { id: generateId(), parsedItemId: item.id, sessionId, sourceLogId, parserVersion: TRPGParser.PARSER_VERSION }));
           }
           tx.objectStore('parsedItems').add(item);
         });

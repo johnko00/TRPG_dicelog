@@ -7,12 +7,48 @@ const parser = require('../src/parser.js');
 const fixturePath = path.join(__dirname, 'fixtures', 'representative-messages.json');
 const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
 const parsed = parser.parseMessages(fixture);
+const htmlFixture = fs.readFileSync(path.join(__dirname, 'fixtures', 'anonymous-ccfolia.html'), 'utf8');
+
+function decodeFixtureText(value) {
+  return value.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
+}
+
+// Node intentionally has no DOM dependency in this project. This tiny adapter
+// models only the document/span methods used by extractMessagesFromDocument.
+function fixtureDocumentFromHtml(html) {
+  const paragraphs = Array.from(html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)).map(match => {
+    const spans = Array.from(match[1].matchAll(/<span\b[^>]*>([\s\S]*?)<\/span>/gi))
+      .map(span => ({ textContent: decodeFixtureText(span[1]) }));
+    return {
+      textContent: spans.map(span => span.textContent).join(''),
+      querySelectorAll(selector) {
+        return selector === 'span' ? spans : [];
+      }
+    };
+  });
+  return {
+    querySelectorAll(selector) {
+      return selector === 'p' ? paragraphs : [];
+    }
+  };
+}
 
 test('fixture parses without dropping messages and carries parserVersion', () => {
   assert.equal(parsed.length, fixture.length);
   assert.ok(parsed.every(item => item.parserVersion === parser.PARSER_VERSION));
   assert.deepEqual(parsed.at(-1).itemType, 'message');
   assert.equal(parsed.at(-1).rawSpeaker, '探索者A');
+});
+
+test('anonymous CCFOLIA HTML flows through extraction and parsing', () => {
+  const items = parser.parseCcfoliaHtml(htmlFixture, { document: fixtureDocumentFromHtml(htmlFixture) });
+  assert.equal(items.length, 3);
+  assert.equal(items[0].channel, '[main]');
+  assert.equal(items[0].rawSpeaker, '探索者A');
+  assert.equal(items[0].itemType, 'roll');
+  assert.equal(items[0].rollData.rolledValue, 19);
+  assert.equal(items[1].itemType, 'status');
+  assert.equal(items[2].itemType, 'message');
 });
 
 test('CoC6 success/special/critical/fumble and raw/effective targets', () => {
@@ -42,6 +78,24 @@ test('CoC7 regular, bonus, penalty, hard and extreme keep the selected roll', ()
   assert.equal(extreme.rollData.targetValue, 10);
 });
 
+test('CoC7 selected value uses the final adopted-value segment', () => {
+  const bonus = parser.parseMessage({ body: 'CC1<=50 目星 (1D100<=50) ボーナス・ペナルティダイス[1] ＞ 44, 54 ＞ 44 ＞ レギュラー成功' });
+  const penalty = parser.parseMessage({ body: 'CC-1<=50 目星 (1D100<=50) ボーナス・ペナルティダイス[-1] ＞ 3, 93 ＞ 93 ＞ 失敗' });
+  const reversedCandidates = parser.parseMessage({ body: 'CC1<=50 目星 (1D100<=50) ボーナス・ペナルティダイス[1] ＞ 54, 44 ＞ 54 ＞ レギュラー成功' });
+  assert.equal(bonus.rollData.rolledValue, 44);
+  assert.equal(penalty.rollData.rolledValue, 93);
+  assert.equal(reversedCandidates.rollData.rolledValue, 54);
+});
+
+test('parseResult prioritizes critical and normalizes each result label', () => {
+  assert.equal(parser.parseResult('決定的成功/スペシャル', 'CoC6').normalizedResult, 'critical');
+  assert.equal(parser.parseResult('レギュラー成功', 'CoC7').normalizedResult, 'success');
+  assert.equal(parser.parseResult('ハード成功', 'CoC7').normalizedResult, 'hardSuccess');
+  assert.equal(parser.parseResult('イクストリーム成功', 'CoC7').normalizedResult, 'extremeSuccess');
+  assert.equal(parser.parseResult('失敗', 'CoC7').normalizedResult, 'failure');
+  assert.equal(parser.parseResult('ファンブル', 'CoC7').normalizedResult, 'fumble');
+});
+
 test('SAN judgement and plain dice are separated for analysis', () => {
   const san = parsed[12].rollData;
   const plain = parsed[13].rollData;
@@ -67,6 +121,24 @@ test('success-rate inputs exclude non-judgement dice and unknown results', () =>
   assert.ok(nonJudgement.every(item => item.rollData.normalizedResult === 'unknown'));
 });
 
+test('unsupported dice-like commands remain unknown and preserve source fields', () => {
+  for (const body of [
+    'CBR<=50 (1D100<=50) ＞ 12 ＞ 成功',
+    'choice[成功,失敗] ＞ 成功',
+    'res 1d100 ＞ 42',
+    'DM<=30 ＞ 18 ＞ 成功'
+  ]) {
+    const item = parser.parseMessage({ sequence: 7, channel: '[other]', rawSpeaker: '探索者A', body, rawText: `raw:${body}` });
+    assert.equal(item.itemType, 'unknown');
+    assert.equal(item.rawText, `raw:${body}`);
+    assert.equal(item.rawSpeaker, '探索者A');
+    assert.equal(item.channel, '[other]');
+    assert.equal(item.sequence, 7);
+    assert.equal(item.parserVersion, parser.PARSER_VERSION);
+  }
+  assert.equal(parser.parseMessage({ body: '普通の会話 ＞ これは会話です' }).itemType, 'message');
+});
+
 test('safe target expression evaluator rejects executable input', () => {
   assert.equal(parser.evaluateTargetExpression('14*5'), 70);
   assert.equal(parser.evaluateTargetExpression('45/2'), 22);
@@ -84,4 +156,45 @@ test('X5 style messages expose multiple roll records without losing the source i
   assert.equal(item.rollData.rolls[1].normalizedResult, 'success');
   assert.equal(item.rollData.rolls[2].rolledValue, 1);
   assert.equal(item.rollData.skillRaw, '正気度喪失');
+});
+
+test('roll record builder keeps parsed item and source ordering for every roll', () => {
+  const item = parser.parseMessage({ sequence: 12, rawSpeaker: '探索者A', body: 'X3 sccb<=30 正気度喪失 #1 (1D100<=30) ＞ 31 ＞ 失敗 #2 (1D100<=30) ＞ 12 ＞ 成功' });
+  const records = item.rollData.rolls.map((rollData, rollIndex) => parser.buildRollRecord(item, rollData, {
+    id: `roll-${rollIndex}`,
+    parsedItemId: 'parsed-1',
+    sessionId: 'session-1',
+    sourceLogId: 'source-1',
+    rollIndex
+  }));
+  assert.deepEqual(records.map(record => [record.parsedItemId, record.rollIndex, record.sourceRollIndex, record.parentSequence, record.sequenceInSession]), [
+    ['parsed-1', 0, 1, 12, 12],
+    ['parsed-1', 1, 2, 12, 12]
+  ]);
+});
+
+test('status record builder contains all IndexedDB fields', () => {
+  const item = parsed[14];
+  const record = parser.buildStatusChangeRecord(item, {
+    id: 'status-1',
+    parsedItemId: 'parsed-1',
+    sessionId: 'session-1',
+    sourceLogId: 'source-1'
+  });
+  assert.deepEqual(record, {
+    id: 'status-1',
+    parsedItemId: 'parsed-1',
+    sessionId: 'session-1',
+    sourceLogId: 'source-1',
+    parserVersion: parser.PARSER_VERSION,
+    rawSpeaker: 'system',
+    speaker: '真壁 凌',
+    statusName: 'SAN',
+    stat: 'SAN',
+    before: 87,
+    after: 86,
+    delta: -1,
+    rawText: '[ 真壁 凌 ] SAN : 87 → 86',
+    sequenceInSession: 15
+  });
 });

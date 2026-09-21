@@ -12,7 +12,7 @@
     root.TRPGParser = factory();
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
-  const PARSER_VERSION = 2;
+  const PARSER_VERSION = 3;
   const SUCCESS_RESULTS = ['critical', 'special', 'success', 'hardSuccess', 'extremeSuccess'];
   const FAILURE_RESULTS = ['failure', 'fumble'];
 
@@ -83,6 +83,10 @@
     return { result, normalizedResult, nativeResult: text, system };
   }
 
+  function isUnsupportedDiceCommand(command) {
+    return /^\s*(?:CBR|choice|res|sanc|DM|D66)\b/i.test(String(command));
+  }
+
   function extractRollValue(parts) {
     for (let index = parts.length - 2; index >= 1; index -= 1) {
       const segment = String(parts[index]).trim();
@@ -147,6 +151,62 @@
     };
   }
 
+  function buildStatusChangeRecord(item, context) {
+    const status = item.statusData || {};
+    return {
+      id: context.id,
+      parsedItemId: context.parsedItemId,
+      sessionId: context.sessionId,
+      sourceLogId: context.sourceLogId,
+      parserVersion: context.parserVersion == null ? PARSER_VERSION : context.parserVersion,
+      rawSpeaker: item.rawSpeaker || '',
+      speaker: status.speaker || item.rawSpeaker || '',
+      statusName: status.statusName || status.stat || null,
+      stat: status.stat || status.statusName || null,
+      before: status.before,
+      after: status.after,
+      delta: status.delta,
+      rawText: item.rawText || item.body || '',
+      sequenceInSession: item.sequence
+    };
+  }
+
+  function buildRollRecord(item, rollData, context) {
+    const rollIndex = context.rollIndex == null ? 0 : context.rollIndex;
+    return {
+      id: context.id,
+      parsedItemId: context.parsedItemId,
+      sessionId: context.sessionId,
+      sourceLogId: context.sourceLogId,
+      parserVersion: context.parserVersion == null ? PARSER_VERSION : context.parserVersion,
+      system: rollData.system,
+      rawSpeaker: item.rawSpeaker,
+      pcId: null,
+      plId: null,
+      rawCommand: String(item.body || '').split('＞')[0].trim(),
+      skillRaw: rollData.skillRaw,
+      skillCanonical: null,
+      skillCategory: null,
+      targetRaw: rollData.targetRaw,
+      targetValue: rollData.targetValue,
+      rolledValue: rollData.rolledValue,
+      result: rollData.result,
+      normalizedResult: rollData.normalizedResult,
+      nativeResult: rollData.nativeResult,
+      resultRaw: rollData.resultRaw,
+      bonusPenalty: rollData.bonusPenalty,
+      difficulty: rollData.difficulty,
+      isJudgement: rollData.isJudgement,
+      isSanCheck: Boolean(rollData.skillRaw?.includes('正気度')),
+      isExact1: rollData.rolledValue === 1,
+      isExact100: rollData.rolledValue === 100,
+      rollIndex,
+      sourceRollIndex: rollData.index == null ? rollIndex : rollData.index,
+      parentSequence: item.sequence,
+      sequenceInSession: item.sequence
+    };
+  }
+
   function parseMessage(input) {
     const item = { ...input };
     const body = normalizeBody(item.body || item.rawText || '');
@@ -167,9 +227,17 @@
     const coc7Match = commandForParser.match(/^CC(?:[+-]?\d+)?\s*<=/i);
     const isTargetedD100 = /^1D100\s*<=/i.test(commandForParser);
     const hasDiceCommand = /\b\d+[dD]\d+\b/.test(commandForParser);
+    const unsupportedDiceCommand = isUnsupportedDiceCommand(commandForParser);
     const hasResultSeparator = body.includes('＞');
+    if (unsupportedDiceCommand) {
+      item.itemType = 'unknown';
+      item.unknownReason = 'unsupported-dice-command';
+      item.unknownCommand = commandForParser;
+      return item;
+    }
     if (!(hasResultSeparator && (isCoc6 || coc7Match || isTargetedD100 || hasDiceCommand))) {
-      item.itemType = 'message';
+      item.itemType = hasDiceCommand ? 'unknown' : 'message';
+      if (item.itemType === 'unknown') item.unknownReason = 'unparsed-dice-message';
       return item;
     }
 
@@ -215,11 +283,18 @@
     }));
   }
 
-  function parseCcfoliaHtml(htmlString) {
-    if (typeof DOMParser === 'undefined') {
-      throw new Error('parseCcfoliaHtml requires a browser DOMParser; use parseMessages in Node tests.');
+  function parseCcfoliaHtml(htmlString, options) {
+    const config = options || {};
+    const doc = config.document || (typeof DOMParser !== 'undefined'
+      ? new DOMParser().parseFromString(String(htmlString), 'text/html')
+      : null);
+    if (!doc) {
+      throw new Error('parseCcfoliaHtml requires a browser DOMParser or an injected document.');
     }
-    const doc = new DOMParser().parseFromString(String(htmlString), 'text/html');
+    return parseMessages(extractMessagesFromDocument(doc));
+  }
+
+  function extractMessagesFromDocument(doc) {
     const messages = [];
     doc.querySelectorAll('p').forEach((p, index) => {
       const spans = p.querySelectorAll('span');
@@ -232,7 +307,7 @@
         rawText: p.textContent.trim()
       });
     });
-    return parseMessages(messages);
+    return messages;
   }
 
   return {
@@ -240,6 +315,10 @@
     SUCCESS_RESULTS,
     FAILURE_RESULTS,
     evaluateTargetExpression,
+    parseResult,
+    extractMessagesFromDocument,
+    buildStatusChangeRecord,
+    buildRollRecord,
     parseMessage,
     parseMessages,
     parseCcfoliaHtml
