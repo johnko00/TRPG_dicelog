@@ -12,7 +12,7 @@
     root.TRPGParser = factory();
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
-  const PARSER_VERSION = 3;
+  const PARSER_VERSION = 4;
   const SUCCESS_RESULTS = ['critical', 'special', 'success', 'hardSuccess', 'extremeSuccess'];
   const FAILURE_RESULTS = ['failure', 'fumble'];
 
@@ -43,8 +43,12 @@
   }
 
   function extractTarget(command) {
-    const match = String(command).match(/(?:CCB|CC(?:[+-]?\d+)?|1D100)\s*<=\s*([^\s(]+)/i);
-    return match ? match[1] : null;
+    const value = String(command);
+    const primary = value.match(/^\s*(?:CCB|CC(?:[+-]?\d+)?|1D100)\s*<=\s*([^\s(),)]+)/i);
+    if (primary) return primary[1].replace(/[,，]+$/, '');
+    const embedded = Array.from(value.matchAll(/1D100\s*<=\s*([^\s(),)]+)/ig))
+      .map(match => match[1].replace(/[,，]+$/, ''));
+    return embedded.length === 1 ? embedded[0] : null;
   }
 
   function extractSkill(command) {
@@ -84,7 +88,34 @@
   }
 
   function isUnsupportedDiceCommand(command) {
-    return /^\s*(?:CBR|choice|res|sanc|DM|D66)\b/i.test(String(command));
+    return /^\s*(?:CBR|choice|res|sanc|DM|D66|BMR)\b/i.test(String(command));
+  }
+
+  // CCFOLIA uses a leading S for secret commands. Only strip it when the
+  // remaining token is an unambiguous DiceBot command; ordinary prose that
+  // happens to begin with "S" must remain a message.
+  function normalizeCommandPrefix(command) {
+    const original = String(command || '').trim();
+    const secretCommand = original.match(/^S(?=(?:CCB|CC(?:[+-]?\d+)?\s*<=|\d+[dD]\d+\b|[dD]\d+\b|RESB?\b|CBRB\b|CHOICE\b))/i);
+    if (!secretCommand) return { command: original, isSecret: false };
+    return { command: original.slice(1).trimStart(), isSecret: true };
+  }
+
+  function hasGenericDiceCommand(command) {
+    return /^\s*(?:\d+[dD]\d+|[dD]\d+)\b/.test(String(command));
+  }
+
+  function stripMultiplePrefix(command) {
+    const value = String(command || '');
+    const match = value.match(/^X\d+(?=\s|CCB|CC(?:[+-]?\d+)?\s*<=|1D\d+\b|D\d+\b|RESB\b|CBRB\b|[({])/i);
+    if (!match) return { command: value, hasMultiplePrefix: false };
+    return { command: value.slice(match[0].length).trimStart(), hasMultiplePrefix: true };
+  }
+
+  function isDiceBotCommandPrefix(command) {
+    const value = String(command || '').trim();
+    return /^(?:X\d+|(?:CCB|CC(?:[+-]?\d+)?\s*<=)|(?:1D100|\d+[dD]\d+|[dD]\d+)|(?:CBR|CBRB|choice|res|resb|sanc|DM|D66|BMR))\b/i.test(value)
+      || /^(?:CCB|CC(?:[+-]?\d+)?\s*<=|1D100\s*<=)/i.test(value);
   }
 
   function extractRollValue(parts) {
@@ -179,6 +210,7 @@
       sessionId: context.sessionId,
       sourceLogId: context.sourceLogId,
       parserVersion: context.parserVersion == null ? PARSER_VERSION : context.parserVersion,
+      isSecret: Boolean(rollData.isSecret),
       system: rollData.system,
       rawSpeaker: item.rawSpeaker,
       pcId: null,
@@ -197,7 +229,7 @@
       bonusPenalty: rollData.bonusPenalty,
       difficulty: rollData.difficulty,
       isJudgement: rollData.isJudgement,
-      isSanCheck: Boolean(rollData.skillRaw?.includes('正気度')),
+      isSanCheck: Boolean(rollData.isSanCheck || rollData.skillRaw?.includes('正気度')),
       isExact1: rollData.rolledValue === 1,
       isExact100: rollData.rolledValue === 100,
       rollIndex,
@@ -222,22 +254,33 @@
     }
 
     const command = body.split('＞')[0].trim();
-    const commandForParser = command.replace(/^\s*X\d+\s+/i, '').replace(/^S(?=CCB\s*<=)/i, '');
+    const multiplePrefix = stripMultiplePrefix(command);
+    const commandWithoutMultiple = multiplePrefix.command;
+    const commandPrefix = normalizeCommandPrefix(commandWithoutMultiple);
+    const commandForParser = commandPrefix.command;
     const isCoc6 = /^CCB\s*<=/i.test(commandForParser);
     const coc7Match = commandForParser.match(/^CC(?:[+-]?\d+)?\s*<=/i);
     const isTargetedD100 = /^1D100\s*<=/i.test(commandForParser);
-    const hasDiceCommand = /^\s*\d+[dD]\d+\b/.test(commandForParser);
-    const unsupportedDiceCommand = isUnsupportedDiceCommand(commandForParser);
+    const hasDiceCommand = hasGenericDiceCommand(commandForParser);
+    const isResistanceCommand = /^RESB?\b/i.test(commandForParser);
+    const isResistanceRoll = isResistanceCommand && /1D100\s*<=/i.test(commandForParser);
+    const isCombinedRoll = /^CBRB\b/i.test(commandForParser);
+    const isSpecialJudgement = isResistanceRoll || isCombinedRoll;
+    const unsupportedDiceCommand = isUnsupportedDiceCommand(commandForParser) && !isResistanceRoll;
     const hasResultSeparator = body.includes('＞');
+    item.isSecret = commandPrefix.isSecret;
+    item.rawCommand = command;
     if (unsupportedDiceCommand) {
       item.itemType = 'unknown';
       item.unknownReason = 'unsupported-dice-command';
       item.unknownCommand = commandForParser;
       return item;
     }
-    if (!(hasResultSeparator && (isCoc6 || coc7Match || isTargetedD100 || hasDiceCommand))) {
-      item.itemType = hasDiceCommand ? 'unknown' : 'message';
+    const commandLike = multiplePrefix.hasMultiplePrefix || isDiceBotCommandPrefix(commandForParser);
+    if (!(hasResultSeparator && (isCoc6 || coc7Match || isTargetedD100 || hasDiceCommand || isSpecialJudgement))) {
+      item.itemType = hasDiceCommand || commandLike ? 'unknown' : 'message';
       if (item.itemType === 'unknown') item.unknownReason = 'unparsed-dice-message';
+      if (item.itemType === 'unknown') item.unknownCommand = commandForParser;
       return item;
     }
 
@@ -261,11 +304,23 @@
       normalizedResult: result.normalizedResult,
       nativeResult: result.nativeResult,
       resultRaw,
-      isJudgement: Boolean(isCoc6 || coc7Match || isTargetedD100),
+      isJudgement: Boolean(isCoc6 || coc7Match || isTargetedD100 || isSpecialJudgement),
+      isSecret: commandPrefix.isSecret,
+      rawCommand: command,
+      isSanCheck: /正気度|SANチェック/i.test(`${commandForParser} ${resultRaw}`),
       bonusPenalty: coc7Match ? extractBonusPenalty(body, commandForParser) : null,
       difficulty: /<=\s*[^\s(]*h\b/i.test(commandForParser) ? 'hard'
         : /<=\s*[^\s(]*e\b/i.test(commandForParser) ? 'extreme' : null
     };
+    // Resistance/combined outputs sometimes report only an automatic result
+    // and omit the adopted d100 value. Keep those records as unknown rather
+    // than creating a judgement roll with an unverifiable rolledValue.
+    if (isSpecialJudgement && rollData.rolledValue == null) {
+      item.itemType = 'unknown';
+      item.unknownReason = 'unparsed-dice-message';
+      item.unknownCommand = commandForParser;
+      return item;
+    }
     const multipleRolls = parseMultipleRolls(body, rollData);
     if (multipleRolls.length) rollData.rolls = multipleRolls;
     item.itemType = 'roll';

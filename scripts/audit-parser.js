@@ -67,24 +67,40 @@ function collectFiles(inputs) {
 }
 
 function commandSignature(item) {
-  const command = String(item.unknownCommand || item.body || '').split('＞')[0].trim();
+  const command = String(item.rawCommand || item.unknownCommand || item.body || '').split('＞')[0].trim();
   if (!command) return '(empty)';
   return command
     .replace(/\([^)]*\)/g, '(...)')
+    .replace(/\[[^\]]*\]/g, '[...]')
     .replace(/\d+(?:\.\d+)?/g, '#')
+    .replace(/[^A-Za-z0-9_+<>=*/.,:;#()\[\]{}\-\s]/g, '?')
     .replace(/\s+/g, ' ')
     .slice(0, 100);
 }
 
+function isMessageDiceBotCandidate(item) {
+  if (item.itemType !== 'message') return false;
+  const body = String(item.body || '').trim();
+  const command = body.split('＞')[0].trim();
+  const hasDiceBotStructure = body.includes('＞') || /[({\[]/.test(command);
+  if (!hasDiceBotStructure) return false;
+  return /^(?:X\d+|BMR|S?(?:CCB|CC(?:[+-]?\d+)?\s*<=|RESB|CBRB|CHOICE)|S?(?:\d+[dD]\d+|[dD]\d+)|(?:CBR|choice|res|sanc|DM|D66))\b/i.test(command)
+    || /^(?:S?(?:CCB|CC(?:[+-]?\d+)?\s*<=|1D100\s*<=))/i.test(command);
+}
+
 function unknownCategory(item) {
-  const command = String(item.unknownCommand || item.body || '').trim();
-  if (/^CBR\b/i.test(command)) return 'CBR';
-  if (/^choice\b/i.test(command)) return 'choice';
-  if (/^res\b/i.test(command)) return 'res';
+  const command = String(item.rawCommand || item.unknownCommand || item.body || '').trim();
+  if (/^S?CBRB\b/i.test(command)) return 'CBRB';
+  if (/^S?RESB?\b/i.test(command)) return 'RESB';
+  if (/^X\d+\b/i.test(command)) return 'Xn';
+  if (/^(?:S?\d+[dD]\d+|S?[dD]\d+)\b/i.test(command)) return 'generic-dice';
+  if (/^S?CBR\b/i.test(command)) return 'CBR';
+  if (/^S?choice\b/i.test(command)) return 'choice';
+  if (/^S?res\b/i.test(command)) return 'res';
   if (/^sanc\b/i.test(command)) return 'sanc';
   if (/^DM\b/i.test(command)) return 'DM';
   if (/^D66\b/i.test(command)) return 'D66';
-  if (/^(?:CC|CCB)\b/i.test(command)) return 'unsupported-CoC';
+  if (/^S?(?:CC|CCB)\b/i.test(command)) return 'unsupported-CoC';
   if (/^[A-Z][A-Z0-9_-]{1,}\b/i.test(command)) return 'other-DiceBot';
   return 'other';
 }
@@ -103,10 +119,15 @@ function emptySummary(file) {
     unknownReasons: {},
     unknownCategories: {},
     suspiciousRolls: { count: 0, signatures: {} },
+    messageDiceBotCandidates: { count: 0, signatures: {} },
     statusNames: {},
     statusMissingFieldCount: 0,
     sanCheckRollCount: 0,
     sanCheckBySystem: { CoC6: 0, CoC7: 0, unknown: 0 },
+    sanCommandForms: {},
+    sanCommandFormsBySystem: { CoC6: {}, CoC7: {}, unknown: {} },
+    secretRollCount: 0,
+    secretUnknownCount: 0,
     multiRollMessages: 0,
     expandedRollCount: 0,
     targetMissingCount: 0,
@@ -125,6 +146,10 @@ function auditFile(file) {
   summary.totalMessages = items.length;
   for (const item of items) {
     addCount(summary.itemTypes, item.itemType);
+    if (isMessageDiceBotCandidate(item)) {
+      summary.messageDiceBotCandidates.count += 1;
+      addCount(summary.messageDiceBotCandidates.signatures, commandSignature(item));
+    }
     if (item.itemType === 'status') {
       addCount(summary.statusNames, item.statusData?.statusName || 'unknown');
       for (const field of ['speaker', 'statusName', 'before', 'after', 'delta', 'rawText']) {
@@ -133,6 +158,7 @@ function auditFile(file) {
       continue;
     }
     if (item.itemType === 'unknown') {
+      if (item.isSecret) summary.secretUnknownCount += 1;
       addCount(summary.unknownReasons, item.unknownReason || 'unknown');
       addCount(summary.unknownCategories, unknownCategory(item));
       continue;
@@ -146,10 +172,15 @@ function auditFile(file) {
       addCount(summary.systems, roll.system || 'unknown');
       if (roll.isJudgement) summary.judgementRollCount += 1;
       else summary.nonJudgementDiceCount += 1;
-      if (roll.isJudgement && /正気度|SANチェック/i.test(roll.skillRaw || '')) {
+      if (roll.isJudgement && (roll.isSanCheck || /正気度|SANチェック/i.test(roll.skillRaw || ''))) {
         summary.sanCheckRollCount += 1;
         addCount(summary.sanCheckBySystem, roll.system || 'unknown');
+        const sanForm = commandSignature(item);
+        const sanSystem = roll.system || 'unknown';
+        addCount(summary.sanCommandForms, sanForm);
+        addCount(summary.sanCommandFormsBySystem[sanSystem] || (summary.sanCommandFormsBySystem[sanSystem] = {}), sanForm);
       }
+      if (roll.isSecret) summary.secretRollCount += 1;
       if (roll.normalizedResult && summary.results[roll.normalizedResult] != null) {
         summary.results[roll.normalizedResult] += 1;
       }
@@ -178,10 +209,18 @@ function aggregateSummaries(summaries) {
     for (const [key, value] of Object.entries(summary.unknownCategories)) addCount(totals.unknownCategories, key, value);
     for (const [key, value] of Object.entries(summary.suspiciousRolls.signatures)) addCount(totals.suspiciousRolls.signatures, key, value);
     totals.suspiciousRolls.count += summary.suspiciousRolls.count;
+    for (const [key, value] of Object.entries(summary.messageDiceBotCandidates.signatures)) addCount(totals.messageDiceBotCandidates.signatures, key, value);
+    totals.messageDiceBotCandidates.count += summary.messageDiceBotCandidates.count;
     for (const [key, value] of Object.entries(summary.statusNames)) addCount(totals.statusNames, key, value);
     totals.statusMissingFieldCount += summary.statusMissingFieldCount;
     totals.sanCheckRollCount += summary.sanCheckRollCount;
     for (const key of Object.keys(totals.sanCheckBySystem)) totals.sanCheckBySystem[key] += summary.sanCheckBySystem[key] || 0;
+    for (const [key, value] of Object.entries(summary.sanCommandForms)) addCount(totals.sanCommandForms, key, value);
+    for (const system of Object.keys(totals.sanCommandFormsBySystem)) {
+      for (const [key, value] of Object.entries(summary.sanCommandFormsBySystem[system] || {})) addCount(totals.sanCommandFormsBySystem[system], key, value);
+    }
+    totals.secretRollCount += summary.secretRollCount;
+    totals.secretUnknownCount += summary.secretUnknownCount;
     totals.multiRollMessages += summary.multiRollMessages;
     totals.expandedRollCount += summary.expandedRollCount;
     totals.targetMissingCount += summary.targetMissingCount;

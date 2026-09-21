@@ -203,3 +203,74 @@ test('status record builder contains all IndexedDB fields', () => {
     sequenceInSession: 15
   });
 });
+
+test('secret prefixes are retained while parsing generic and judgement rolls', () => {
+  const generic = parser.parseMessage({ body: 'S1D10 (1D10) ＞ 7' });
+  const bareGeneric = parser.parseMessage({ body: 'D10 (D10) ＞ 5' });
+  const judgement = parser.parseMessage({ body: 'SCC<=50 目星 (1D100<=50) ＞ 30 ＞ 成功' });
+  assert.equal(generic.itemType, 'roll');
+  assert.equal(generic.isSecret, true);
+  assert.equal(generic.rollData.isSecret, true);
+  assert.equal(generic.rollData.isJudgement, false);
+  assert.equal(generic.rollData.rolledValue, 7);
+  assert.equal(bareGeneric.itemType, 'roll');
+  assert.equal(bareGeneric.rollData.isJudgement, false);
+  assert.equal(bareGeneric.rollData.rolledValue, 5);
+  assert.equal(judgement.itemType, 'roll');
+  assert.equal(judgement.rollData.isSecret, true);
+  assert.equal(judgement.rollData.system, 'CoC7');
+  assert.equal(judgement.rollData.targetValue, 50);
+  assert.equal(judgement.rollData.rolledValue, 30);
+  assert.equal(judgement.rollData.normalizedResult, 'success');
+});
+
+test('RESB/SRESB and CBRB preserve safe judgement fields without guessing system', () => {
+  const res = parser.parseMessage({ body: 'RES(STR-DEX) (1D100<=50) ＞ 40 ＞ 成功' });
+  const resb = parser.parseMessage({ body: 'RESB(STR-DEX) (1D100<=50) ＞ 40 ＞ 成功' });
+  const secretResb = parser.parseMessage({ body: 'SRESB(STR-DEX) (1D100<=50) ＞ 40 ＞ 成功' });
+  const cbrb = parser.parseMessage({ body: 'CBRB(50,40) (1D100<=50,1D100<=40) ＞ 40 [成功,失敗] ＞ 成功' });
+  for (const item of [res, resb, secretResb, cbrb]) {
+    assert.equal(item.itemType, 'roll');
+    assert.equal(item.rollData.system, 'unknown');
+    assert.equal(item.rollData.isJudgement, true);
+    assert.equal(item.rollData.rolledValue, 40);
+    assert.equal(item.rollData.normalizedResult, 'success');
+  }
+  assert.equal(resb.rollData.targetRaw, '50');
+  assert.equal(resb.rollData.targetValue, 50);
+  assert.equal(res.rollData.targetValue, 50);
+  assert.equal(secretResb.rollData.isSecret, true);
+  assert.equal(cbrb.rollData.targetValue, null);
+});
+
+test('unsupported DiceBot commands become unknown without capturing narrative text', () => {
+  const x6 = parser.parseMessage({ body: 'X6{2D6+4}' });
+  const secretChoice = parser.parseMessage({ body: 'SCHOICE[A,B] (choice[A,B]) ＞ A' });
+  const bmr = parser.parseMessage({ body: 'BMR(foo) ＞ 1' });
+  const narrative = parser.parseMessage({ body: '本文中に 1d3 と SCC という文字がある ＞ 会話' });
+  assert.equal(x6.itemType, 'unknown');
+  assert.equal(x6.unknownReason, 'unparsed-dice-message');
+  assert.equal(secretChoice.itemType, 'unknown');
+  assert.equal(secretChoice.isSecret, true);
+  assert.equal(bmr.itemType, 'unknown');
+  assert.equal(narrative.itemType, 'message');
+});
+
+test('SANC remains unknown when the fixture has no safe adopted roll value', () => {
+  const item = parser.parseMessage({ body: 'SANC ＜ 1D100/1D10' });
+  assert.equal(item.itemType, 'unknown');
+  assert.equal(item.unknownReason, 'unsupported-dice-command');
+  assert.equal(item.rawText, 'SANC ＜ 1D100/1D10');
+});
+
+test('secret roll flag is persisted into roll records', () => {
+  const item = parser.parseMessage({ sequence: 4, body: 'S1D6 (1D6) ＞ 3' });
+  const record = parser.buildRollRecord(item, item.rollData, {
+    id: 'roll-secret',
+    parsedItemId: 'parsed-secret',
+    sessionId: 'session-secret',
+    sourceLogId: 'source-secret'
+  });
+  assert.equal(record.isSecret, true);
+  assert.equal(record.parsedItemId, 'parsed-secret');
+});
