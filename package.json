@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Local-first TRPG LOG & BANK parser foundation",
   "scripts": {
-    "test": "node --test tests/parser.test.js"
+    "test": "node --test tests/parser.test.js",
+    "audit-parser": "node scripts/audit-parser.js"
   }
 }
