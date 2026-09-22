@@ -1056,7 +1056,12 @@
       const tx = db.transaction(['savingsRules'], 'readwrite'); if (editingRuleId) tx.objectStore('savingsRules').put(rule); else tx.objectStore('savingsRules').add(rule);
       tx.oncomplete = () => { document.getElementById('rule-edit-modal-wrapper').classList.add('hidden'); loadSavingsRules(db); renderSavings(db); };
     });
-    window.deleteRule = function(id) { if(confirm('この貯金ルールを削除しますか？')) db.transaction(['savingsRules'], 'readwrite').objectStore('savingsRules').delete(id).transaction.oncomplete = () => { loadSavingsRules(db); renderSavings(db); }; };
+    window.deleteRule = function(id) {
+      if (!confirm('この貯金ルールを削除しますか？')) return;
+      const tx = db.transaction(['savingsRules'], 'readwrite');
+      tx.objectStore('savingsRules').delete(id);
+      tx.oncomplete = () => { loadSavingsRules(db); renderSavings(db); };
+    };
 
     // --- ★ダッシュボード & グラフ ---
     async function renderDashboardSummary(db) {
