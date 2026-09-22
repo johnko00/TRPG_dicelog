@@ -241,6 +241,7 @@
         <select id="filter-log-result" style="width: 150px;">
           <option value="">-- 全て --</option><option value="critical">クリティカル</option><option value="fumble">ファンブル</option><option value="success">成功</option><option value="failure">失敗</option>
         </select>
+        <select id="filter-log-exclusion" style="width: 150px;"><option value="">除外状態: すべて</option><option value="included">分析対象</option><option value="analysisExcluded">分析除外</option><option value="savingsExcluded">貯金除外</option><option value="bothExcluded">両方除外</option></select>
         <button id="btn-filter-logs" class="outline">検索</button>
       </div>
       <div id="all-logs-table-container"></div>
@@ -256,9 +257,10 @@
         <button id="btn-create-pc" class="outline">＋ PC作成</button>
         <button id="btn-create-pl" class="outline">＋ PL作成</button>
         <button id="btn-batch-link" disabled>選択を一括紐付け</button>
+        <select id="people-status-filter" style="min-width:150px;"><option value="all">すべて</option><option value="unresolved">未整理</option><option value="resolved">整理済み</option><option value="ignored">整理対象外</option></select>
       </div>
       <table id="people-table">
-        <thead><tr><th style="width: 40px; text-align: center;"><input type="checkbox" id="check-all-aliases"></th><th>ログ上の名前</th><th>状態</th><th>正式PC名</th><th>紐付PL</th><th>登場シナリオ</th><th>操作</th></tr></thead>
+        <thead><tr><th style="width: 40px; text-align: center;"><input type="checkbox" id="check-all-aliases"></th><th>ログ上の名前</th><th>正規化名 / 出現</th><th>状態</th><th>正式キャラクター</th><th>PL</th><th>登場シナリオ / 役割</th><th>操作</th></tr></thead>
         <tbody id="people-table-body"></tbody>
       </table>
     </section>
@@ -301,12 +303,13 @@
 
   <!-- Modals (省略せず保持) -->
   <div id="link-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h3>キャラクターの紐付け設定</h3><p style="color: #94a3b8;">対象: <strong id="link-target-name" style="color: #fff; font-size: 1.1em;"></strong></p><div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--accent-color);"><label style="display:block; margin-bottom: 8px; font-weight: bold; color: var(--accent-color);">担当PL (プレイヤー) を設定</label><select id="link-pc-pl" style="width: 100%;"><option value="">-- 変更しない / 未設定 --</option></select></div><div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;"><label style="display:block; margin-bottom: 8px; font-weight: bold;">それぞれ個別に新規PCとして登録</label><button id="btn-create-individual-link" style="width: 100%;">独立したPCとして登録</button></div><div style="text-align: center; margin: 10px 0; color: #94a3b8;">または</div><div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;"><label style="display:block; margin-bottom: 8px; font-weight: bold;">既存のPCに全てまとめる</label><div class="searchable-select" id="link-pc-dropdown"><input type="text" class="select-search" placeholder="PC名を入力・検索..." autocomplete="off"><input type="hidden" id="link-pc-id-value" class="select-value"><ul class="select-options hidden"></ul></div><button id="btn-save-link" style="width: 100%; margin-top: 10px;" class="outline">選択したPCにまとめる</button></div><div style="display: flex; justify-content: flex-end; margin-top: 20px;"><button class="outline" onclick="document.getElementById('link-modal-wrapper').classList.add('hidden')">キャンセル</button></div></div></div>
-  <div id="pc-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>PC情報の編集</h2><p style="color: #94a3b8;">ログ上の名前: <strong id="edit-alias-name-display" style="color: #fff;"></strong></p><label style="display:block; margin-bottom:15px; color: var(--accent-color); font-weight: bold;">担当PL:<br><select id="edit-pc-pl" style="width: 100%; margin-top: 5px;"><option value="">-- 未設定 --</option></select></label><label style="display:block; margin-bottom:15px;">紐付け先PC:<br><div class="searchable-select" id="edit-pc-dropdown"><input type="text" class="select-search" placeholder="PC名を入力・検索..." autocomplete="off"><input type="hidden" id="edit-pc-id-value" class="select-value"><ul class="select-options hidden"></ul></div></label><label style="display:flex; align-items: center; gap: 10px; margin-bottom:20px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px;"><input type="checkbox" id="edit-pc-excluded"><span>自動貯金の対象から除外する</span></label><div style="display: flex; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 10px;"><button id="btn-unlink-pc" class="danger">紐付けを解除</button><div style="display: flex; gap: 10px;"><button class="outline" onclick="document.getElementById('pc-edit-modal-wrapper').classList.add('hidden')">キャンセル</button><button id="btn-save-pc-info">保存</button></div></div></div></div>
+  <div id="pc-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>PC情報の編集</h2><p style="color: #94a3b8;">ログ上の名前: <strong id="edit-alias-name-display" style="color: #fff;"></strong></p><label style="display:block; margin-bottom:15px; color: var(--accent-color); font-weight: bold;">担当PL:<br><select id="edit-pc-pl" style="width: 100%; margin-top: 5px;"><option value="">-- 未設定 --</option></select></label><label style="display:block; margin-bottom:15px;">紐付け先PC:<br><div class="searchable-select" id="edit-pc-dropdown"><input type="text" class="select-search" placeholder="PC名を入力・検索..." autocomplete="off"><input type="hidden" id="edit-pc-id-value" class="select-value"><ul class="select-options hidden"></ul></div></label><label style="display:flex; align-items: center; gap: 10px; margin-bottom:20px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px;"><input type="checkbox" id="edit-pc-excluded"><span>自動貯金の対象から除外する（旧設定）</span></label><div style="display: flex; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 10px;"><button id="btn-unlink-pc" class="danger">紐付けを解除</button><button id="btn-delete-pc" class="danger outline">PCを削除</button><div style="display: flex; gap: 10px;"><button class="outline" onclick="document.getElementById('pc-edit-modal-wrapper').classList.add('hidden')">キャンセル</button><button id="btn-save-pc-info">保存</button></div></div></div></div>
   <div id="rule-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>ルールの編集</h2><label style="display:block; margin-bottom:10px;">ルール名: <input type="text" id="edit-rule-name" style="width: calc(100% - 22px);"></label><label style="display:block; margin-bottom:10px;">金額(円): <input type="number" id="edit-rule-amount" style="width: calc(100% - 22px);"></label><label style="display:block; margin-bottom:10px;">出目(カンマ区切り): <input type="text" id="edit-rule-rolls" style="width: calc(100% - 22px);"></label><label style="display:block; margin-bottom:10px;">結果:<br><div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; margin-top: 5px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;"><label><input type="checkbox" class="rule-result-check" value="critical"> クリ</label><label><input type="checkbox" class="rule-result-check" value="fumble"> ファンブル</label><label><input type="checkbox" class="rule-result-check" value="special"> スペシャル</label><label><input type="checkbox" class="rule-result-check" value="success"> 成功</label></div></label><div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;"><button id="btn-save-rule">保存</button><button class="outline" onclick="document.getElementById('rule-edit-modal-wrapper').classList.add('hidden')">キャンセル</button></div></div></div>
   <div id="session-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>セッション編集</h2><label style="display:block; margin-bottom:15px;">シナリオ名:<br><input type="text" id="edit-session-title" style="width: calc(100% - 22px); margin-top: 5px;"></label><label style="display:block; margin-bottom:15px;">セッション日:<br><input type="date" id="edit-session-date" style="width: calc(100% - 22px); margin-top: 5px;"></label><label style="display:block; margin-bottom:15px;">代表画像:<br><input type="file" id="edit-session-image" accept="image/*" style="width: calc(100% - 22px); margin-top: 5px;"></label><img id="edit-session-preview" style="max-width: 100%; max-height: 200px; display: none; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--border-color);" /><div style="display: flex; gap: 10px; justify-content: flex-end;"><button id="btn-save-session">保存</button><button class="outline" onclick="document.getElementById('session-edit-modal-wrapper').classList.add('hidden')">キャンセル</button></div></div></div>
   <div id="ledger-detail-modal-wrapper" class="modal-overlay hidden"><div class="modal large"><h2>履歴の詳細</h2><p style="color: #94a3b8; margin-bottom: 15px;" id="ledger-detail-info"></p><div id="ledger-detail-list" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; max-height: 400px; overflow-y: auto;"></div><div style="display: flex; justify-content: flex-end; margin-top: 20px;"><button class="outline" onclick="document.getElementById('ledger-detail-modal-wrapper').classList.add('hidden')">閉じる</button></div></div></div>
   <div id="calendar-detail-modal-wrapper" class="modal-overlay hidden"><div class="modal large"><h2 id="calendar-detail-date">日付詳細</h2><div id="calendar-detail-content" style="line-height:1.7;"></div><div style="display:flex; justify-content:flex-end; margin-top:20px;"><button class="outline" onclick="document.getElementById('calendar-detail-modal-wrapper').classList.add('hidden')">閉じる</button></div></div></div>
 
+  <script src="src/identity.js"></script>
   <script src="src/parser.js"></script>
   <script>
     // --- クイック入力設定 ---
@@ -322,20 +325,147 @@
     let db;
     let myPlId = localStorage.getItem('myPlId') || null;
 
-    // ★ DBバージョン v9 に変更
+    function backfillStableIdentityData(database) {
+      return new Promise(resolve => {
+        const tx = database.transaction(['sourceLogs', 'parsedItems', 'rollRecords'], 'readwrite');
+        let sourceLogs = [], parsedItems = [], rollRecords = [];
+        tx.objectStore('sourceLogs').getAll().onsuccess = e => sourceLogs = e.target.result;
+        tx.objectStore('parsedItems').getAll().onsuccess = e => parsedItems = e.target.result;
+        tx.objectStore('rollRecords').getAll().onsuccess = e => rollRecords = e.target.result;
+        tx.oncomplete = () => {
+          const bySource = new Map(sourceLogs.map(source => [source.id, source]));
+          const byParsedId = new Map();
+          const grouped = new Map();
+          parsedItems.forEach(item => { if (!grouped.has(item.sourceLogId)) grouped.set(item.sourceLogId, []); grouped.get(item.sourceLogId).push(item); });
+          (async () => {
+            for (const [sourceLogId, items] of grouped.entries()) {
+              const source = bySource.get(sourceLogId);
+              const lineageId = source?.lineageId || TRPGIdentity.deriveLineageId(items);
+              TRPGIdentity.attachStableIdentity(items, { lineageId });
+              await new Promise(done => {
+                const parsedStore = database.transaction(['parsedItems', 'rollRecords'], 'readwrite');
+                items.forEach(item => { parsedStore.objectStore('parsedItems').put(item); byParsedId.set(item.id, item); });
+                rollRecords.filter(record => items.some(item => item.id === record.parsedItemId)).forEach(record => {
+                  const item = byParsedId.get(record.parsedItemId) || items.find(candidate => candidate.id === record.parsedItemId);
+                  if (!item) return;
+                  const fingerprint = item.messageFingerprint;
+                  record.lineageId = item.lineageId; record.sourceMessageKey = item.sourceMessageKey;
+                  record.messageFingerprint = fingerprint; record.messageOccurrence = item.messageOccurrence;
+                  record.sourceRollIndex = record.sourceRollIndex == null ? (record.rollIndex || 0) : record.sourceRollIndex;
+                  record.sourceKey = record.sourceKey || TRPGIdentity.buildSourceKey(item.lineageId, fingerprint, item.messageOccurrence, record.sourceRollIndex);
+                  parsedStore.objectStore('rollRecords').put(record);
+                });
+                parsedStore.oncomplete = done; parsedStore.onerror = done;
+              });
+            }
+            resolve();
+          })();
+        };
+        tx.onerror = () => resolve();
+      });
+    }
+
+    // Phase 2 adds stable identity, session roles, and roll overrides without
+    // changing the existing store names or confirmed ledger records.
     const initDB = () => {
       return new Promise((resolve, reject) => {
-        const request = indexedDB.open('TRPGBankDB_v9', 1);
+        const request = indexedDB.open('TRPGBankDB_v9', 2);
         request.onupgradeneeded = (e) => {
           const database = e.target.result;
-          ['sessions', 'sourceLogs', 'rollRecords', 'ledgerEntries', 'parsedItems', 'statusChanges', 'aliasMappings', 'pcs', 'pls', 'savingsRules'].forEach(name => {
+          const storeNames = ['sessions', 'sourceLogs', 'rollRecords', 'ledgerEntries', 'parsedItems', 'statusChanges', 'aliasMappings', 'pcs', 'pls', 'savingsRules', 'sessionParticipants', 'rollOverrides'];
+          storeNames.forEach(name => {
             if (!database.objectStoreNames.contains(name)) {
               const opts = { keyPath: name === 'aliasMappings' ? 'rawNameNormalized' : 'id' };
               const store = database.createObjectStore(name, opts);
-              if (name === 'sourceLogs') store.createIndex('fileHash', 'fileHash', { unique: true });
+              if (name === 'sourceLogs') {
+                store.createIndex('fileHash', 'fileHash', { unique: true });
+                store.createIndex('lineageId', 'lineageId', { unique: false });
+              }
               if (name === 'parsedItems') store.createIndex('sessionId', 'sessionId', { unique: false });
+              if (name === 'rollRecords') {
+                store.createIndex('sessionId', 'sessionId', { unique: false });
+                store.createIndex('sourceKey', 'sourceKey', { unique: false });
+                store.createIndex('parsedItemId', 'parsedItemId', { unique: false });
+              }
+              if (name === 'sessionParticipants') {
+                store.createIndex('sessionId', 'sessionId', { unique: false });
+                store.createIndex('pcId', 'pcId', { unique: false });
+                store.createIndex('plId', 'plId', { unique: false });
+              }
+              if (name === 'rollOverrides') store.createIndex('sourceKey', 'sourceKey', { unique: true });
+              if (name === 'aliasMappings') {
+                store.createIndex('rawSpeakerNormalized', 'rawSpeakerNormalized', { unique: false });
+                store.createIndex('scope', 'scope', { unique: false });
+                store.createIndex('sessionId', 'sessionId', { unique: false });
+              }
             }
           });
+          const now = new Date().toISOString();
+          if (database.objectStoreNames.contains('sourceLogs')) {
+            const store = e.target.transaction.objectStore('sourceLogs');
+            if (!store.indexNames.contains('lineageId')) store.createIndex('lineageId', 'lineageId', { unique: false });
+            if (!store.indexNames.contains('contentFingerprint')) store.createIndex('contentFingerprint', 'contentFingerprint', { unique: false });
+            if (!store.indexNames.contains('previousSourceLogId')) store.createIndex('previousSourceLogId', 'previousSourceLogId', { unique: false });
+            store.openCursor().onsuccess = event => {
+              const cursor = event.target.result;
+              if (!cursor) return;
+              const value = cursor.value;
+              if (!value.lineageId) value.lineageId = value.fileHash ? `lineage:${value.fileHash}` : generateId();
+              if (!value.contentFingerprint) value.contentFingerprint = value.fileHash || null;
+              if (!value.parserVersion) value.parserVersion = value.parseVersion || TRPGParser.PARSER_VERSION;
+              cursor.update(value);
+              cursor.continue();
+            };
+          }
+          if (database.objectStoreNames.contains('pcs')) {
+            const store = e.target.transaction.objectStore('pcs');
+            store.openCursor().onsuccess = event => {
+              const cursor = event.target.result;
+              if (!cursor) return;
+              const value = cursor.value;
+              value.aliases = Array.isArray(value.aliases) ? value.aliases : [];
+              value.memo = value.memo || '';
+              value.createdAt = value.createdAt || now;
+              value.updatedAt = value.updatedAt || now;
+              cursor.update(value);
+              cursor.continue();
+            };
+          }
+          if (database.objectStoreNames.contains('pls')) {
+            const store = e.target.transaction.objectStore('pls');
+            store.openCursor().onsuccess = event => {
+              const cursor = event.target.result;
+              if (!cursor) return;
+              const value = cursor.value;
+              value.aliases = Array.isArray(value.aliases) ? value.aliases : [];
+              value.memo = value.memo || '';
+              value.createdAt = value.createdAt || now;
+              value.updatedAt = value.updatedAt || now;
+              cursor.update(value);
+              cursor.continue();
+            };
+          }
+          if (database.objectStoreNames.contains('aliasMappings')) {
+            const store = e.target.transaction.objectStore('aliasMappings');
+            if (!store.indexNames.contains('rawSpeakerNormalized')) store.createIndex('rawSpeakerNormalized', 'rawSpeakerNormalized', { unique: false });
+            if (!store.indexNames.contains('scope')) store.createIndex('scope', 'scope', { unique: false });
+            if (!store.indexNames.contains('sessionId')) store.createIndex('sessionId', 'sessionId', { unique: false });
+            store.openCursor().onsuccess = event => {
+              const cursor = event.target.result;
+              if (!cursor) return;
+              const value = cursor.value;
+              value.id = value.id || value.rawNameNormalized || generateId();
+              value.rawSpeakerNormalized = value.rawSpeakerNormalized || value.rawNameNormalized || '';
+              value.rawSpeakerExample = value.rawSpeakerExample || value.rawNameExamples?.[0] || value.rawSpeakerNormalized;
+              value.scope = value.scope || 'global';
+              value.sessionId = value.sessionId || null;
+              value.ignored = Boolean(value.ignored);
+              value.createdAt = value.createdAt || now;
+              value.updatedAt = value.updatedAt || now;
+              cursor.update(value);
+              cursor.continue();
+            };
+          }
         };
         request.onsuccess = e => { 
           db = e.target.result; 
@@ -352,13 +482,13 @@
               DEFAULT_RULES.forEach(r => store.add(r));
             }
           };
-          resolve(db); 
+          backfillStableIdentityData(db).then(() => resolve(db));
         };
         request.onerror = e => reject(e.target.error);
       });
     };
 
-    function normalizeName(name) { return name ? name.normalize('NFKC').replace(/^[\s ]+|[\s ]+$/g, '').replace(/[\s ]+/g, ' ') : ''; }
+    function normalizeName(name) { return TRPGIdentity.normalizeSpeakerName(name); }
 
     // --- Searchable Dropdown Logic ---
     function initSearchableDropdown(containerId, plSelectId, getBaseAliasFn) {
@@ -428,7 +558,10 @@
         db.transaction(['sourceLogs'], 'readonly').objectStore('sourceLogs').index('fileHash').get(fileHash).onsuccess = async e => {
           if (e.target.result) return reject(new Error(`「${file.name}」は既に取り込まれています。`));
           const rawHtml = await file.text();
-          resolve({ fileName: file.name, fileHash, rawHtml, parsedItems: parseCcfoliaHtml(rawHtml) });
+          const parsedItems = parseCcfoliaHtml(rawHtml);
+          const lineageId = TRPGIdentity.deriveLineageId(parsedItems);
+          TRPGIdentity.attachStableIdentity(parsedItems, { lineageId });
+          resolve({ fileName: file.name, fileHash, rawHtml, lineageId, contentFingerprint: TRPGIdentity.stableHash(rawHtml), parsedItems });
         };
       });
     }
@@ -437,21 +570,23 @@
       return new Promise((resolve, reject) => {
         const tx = db.transaction(['sessions', 'sourceLogs', 'parsedItems', 'rollRecords', 'statusChanges', 'aliasMappings'], 'readwrite');
         const sessionId = generateId(), sourceLogId = generateId();
+        const lineageId = parsedData.lineageId || TRPGIdentity.deriveLineageId(parsedData.parsedItems);
+        TRPGIdentity.attachStableIdentity(parsedData.parsedItems, { lineageId });
         
         tx.objectStore('sessions').add({ id: sessionId, title: parsedData.fileName.replace(/\.html$/i, ''), dateStart: new Date().toISOString().split('T')[0], dateEnd: null, systemHints: [], sourceLogIds: [sourceLogId], imageAssetId: null, memo: '', tags: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-        tx.objectStore('sourceLogs').add({ id: sourceLogId, sessionId, fileName: parsedData.fileName, fileHash: parsedData.fileHash, rawHtml: parsedData.rawHtml, importedAt: new Date().toISOString(), byteSize: new Blob([parsedData.rawHtml]).size, channelHint: null, sourceType: "ccfolia-html", parseVersion: TRPGParser.PARSER_VERSION, parserVersion: TRPGParser.PARSER_VERSION });
+        tx.objectStore('sourceLogs').add({ id: sourceLogId, sessionId, fileName: parsedData.fileName, fileHash: parsedData.fileHash, contentFingerprint: parsedData.contentFingerprint || TRPGIdentity.stableHash(parsedData.rawHtml), lineageId, previousSourceLogId: null, rawHtml: parsedData.rawHtml, importedAt: new Date().toISOString(), byteSize: new Blob([parsedData.rawHtml]).size, channelHint: null, sourceType: "ccfolia-html", parseVersion: TRPGParser.PARSER_VERSION, parserVersion: TRPGParser.PARSER_VERSION });
 
-        const uniqueNames = new Set();
+        const uniqueNames = new Map();
         parsedData.parsedItems.forEach(item => {
           item.id = generateId(); item.sourceLogId = sourceLogId; item.sessionId = sessionId;
+          if (item.rawSpeaker) { const normalized = TRPGIdentity.normalizeSpeakerName(item.rawSpeaker); if (!uniqueNames.has(normalized)) uniqueNames.set(normalized, item.rawSpeaker); }
           if (item.itemType === 'roll') {
-            uniqueNames.add(item.rawSpeaker);
             const rollEntries = item.rollData.rolls || [item.rollData];
             item.rollIds = [];
             rollEntries.forEach((rollData, rollIndex) => {
               const rollId = generateId();
               item.rollIds.push(rollId);
-              tx.objectStore('rollRecords').add(TRPGParser.buildRollRecord(item, rollData, { id: rollId, parsedItemId: item.id, sessionId, sourceLogId, parserVersion: TRPGParser.PARSER_VERSION, rollIndex }));
+              tx.objectStore('rollRecords').add(TRPGParser.buildRollRecord(item, rollData, { id: rollId, parsedItemId: item.id, sessionId, sourceLogId, lineageId, sourceMessageKey: item.sourceMessageKey, parserVersion: TRPGParser.PARSER_VERSION, rollIndex }));
             });
           } else if (item.itemType === 'status') {
             tx.objectStore('statusChanges').add(TRPGParser.buildStatusChangeRecord(item, { id: generateId(), parsedItemId: item.id, sessionId, sourceLogId, parserVersion: TRPGParser.PARSER_VERSION }));
@@ -460,10 +595,9 @@
         });
 
         const aliasStore = tx.objectStore('aliasMappings');
-        uniqueNames.forEach(rawName => {
-          const normalized = normalizeName(rawName);
+        uniqueNames.forEach((rawName, normalized) => {
           aliasStore.get(normalized).onsuccess = (e) => {
-            if (!e.target.result) aliasStore.add({ rawNameNormalized: normalized, rawNameExamples: [rawName], pcId: null, ignored: false, updatedAt: new Date().toISOString() });
+            if (!e.target.result) aliasStore.add({ id: generateId(), rawNameNormalized: normalized, rawSpeakerNormalized: normalized, rawSpeakerExample: rawName, rawNameExamples: [rawName], pcId: null, plId: null, scope: 'global', sessionId: null, ignored: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
           };
         });
         tx.oncomplete = () => resolve({ sessionId, sourceLogId });
@@ -485,12 +619,15 @@
 
     async function renderAllDiceLogs(db) {
       return new Promise(resolve => {
-        const tx = db.transaction(['rollRecords', 'aliasMappings', 'pcs', 'sessions'], 'readonly');
-        let rolls = [], aliases = [], pcs = [], sessions = [];
+        const tx = db.transaction(['rollRecords', 'aliasMappings', 'pcs', 'pls', 'sessions', 'sessionParticipants', 'rollOverrides'], 'readonly');
+        let rolls = [], aliases = [], pcs = [], pls = [], sessions = [], participants = [], overrides = [];
         tx.objectStore('rollRecords').getAll().onsuccess = e => rolls = e.target.result;
         tx.objectStore('aliasMappings').getAll().onsuccess = e => aliases = e.target.result;
         tx.objectStore('pcs').getAll().onsuccess = e => pcs = e.target.result;
+        tx.objectStore('pls').getAll().onsuccess = e => pls = e.target.result;
         tx.objectStore('sessions').getAll().onsuccess = e => sessions = e.target.result;
+        tx.objectStore('sessionParticipants').getAll().onsuccess = e => participants = e.target.result;
+        tx.objectStore('rollOverrides').getAll().onsuccess = e => overrides = e.target.result;
         
         tx.oncomplete = () => {
           aliasDictForLogs = {};
@@ -498,9 +635,10 @@
              const pc = pcs.find(p => p.id === a.pcId);
              aliasDictForLogs[a.rawNameNormalized] = pc ? pc.name : a.rawNameNormalized;
           });
-          allRollRecordsForList = rolls.filter(r => r.isJudgement).map(r => {
+          allRollRecordsForList = TRPGIdentity.applyRollOverrides(rolls, overrides).map(r => {
              const session = sessions.find(s => s.id === r.sessionId);
-             return { ...r, pcName: aliasDictForLogs[normalizeName(r.rawSpeaker)] || r.rawSpeaker, sessionTitle: session ? session.title : '不明', };
+             const resolved = TRPGIdentity.resolveSpeaker({ rawSpeaker: r.rawSpeaker, sessionId: r.sessionId, mappings: aliases, pcs, pls, sessionParticipants: participants });
+             return { ...r, pcName: resolved.pc?.name || aliasDictForLogs[normalizeName(r.rawSpeaker)] || r.rawSpeaker, role: resolved.role, sessionTitle: session ? session.title : '不明' };
           }).sort((a, b) => b.sequenceInSession - a.sequenceInSession);
           applyLogFilter();
           resolve();
@@ -512,6 +650,7 @@
       const pcFilter = document.getElementById('filter-log-pc').value.toLowerCase();
       const skillFilter = document.getElementById('filter-log-skill').value.toLowerCase();
       const resFilter = document.getElementById('filter-log-result').value;
+      const exclusionFilter = document.getElementById('filter-log-exclusion').value;
 
       const filtered = allRollRecordsForList.filter(r => {
         if (pcFilter && !r.pcName.toLowerCase().includes(pcFilter)) return false;
@@ -522,16 +661,35 @@
           if (resFilter === 'critical' && r.result !== 'critical') return false;
           if (resFilter === 'fumble' && r.result !== 'fumble') return false;
         }
+        if (exclusionFilter === 'included' && (r.analysisExcluded || r.savingsExcluded)) return false;
+        if (exclusionFilter === 'analysisExcluded' && !r.analysisExcluded) return false;
+        if (exclusionFilter === 'savingsExcluded' && !r.savingsExcluded) return false;
+        if (exclusionFilter === 'bothExcluded' && !(r.analysisExcluded && r.savingsExcluded)) return false;
         return true;
       }).slice(0, 300);
 
       const tbodyHTML = filtered.map(r => {
         const val = r.rolledValue !== null ? r.rolledValue : '-'; const tar = r.targetValue !== null ? r.targetValue : '-';
-        return `<tr><td style="font-size: 0.8em; color: #94a3b8;">${r.sessionTitle}</td><td style="font-weight: bold;">${r.pcName}</td><td>${r.skillRaw || '-'}</td><td>${tar}</td><td style="font-weight: bold;">${val}</td><td>${getResultBadge(r.result)}</td></tr>`;
+        const excluded = r.analysisExcluded || r.savingsExcluded;
+        const flags = `${r.analysisExcluded ? '分析除外 ' : ''}${r.savingsExcluded ? '貯金除外' : ''}`.trim();
+        const nextAnalysis = !r.analysisExcluded, nextSavings = !r.savingsExcluded;
+        return `<tr><td style="font-size: 0.8em; color: #94a3b8;">${r.sessionTitle}${r.role ? `<br><span class="badge info">${r.role}</span>` : ''}</td><td style="font-weight: bold;">${r.pcName}</td><td>${r.skillRaw || '-'}</td><td>${tar}</td><td style="font-weight: bold;">${val}</td><td>${getResultBadge(r.result)}${excluded ? `<br><span class="badge warning">${flags}</span>` : ''}</td><td><button class="outline" style="padding:4px 6px;font-size:.75em" onclick="saveRollOverride('${r.sourceKey}', ${nextAnalysis}, ${r.savingsExcluded})">分析${r.analysisExcluded ? '対象' : '除外'}</button> <button class="outline" style="padding:4px 6px;font-size:.75em" onclick="saveRollOverride('${r.sourceKey}', ${r.analysisExcluded}, ${nextSavings})">貯金${r.savingsExcluded ? '対象' : '除外'}</button> <button class="outline" style="padding:4px 6px;font-size:.75em" onclick="saveRollOverride('${r.sourceKey}', true, true)">両方除外</button> <button class="outline" style="padding:4px 6px;font-size:.75em" onclick="saveRollOverride('${r.sourceKey}', false, false)">解除</button></td></tr>`;
       }).join('');
-      document.getElementById('all-logs-table-container').innerHTML = `<table><thead><tr><th>シナリオ</th><th>PC名</th><th>技能</th><th>目標値</th><th>出目</th><th>結果</th></tr></thead><tbody>${tbodyHTML || '<tr><td colspan="6" style="text-align:center;">該当なし</td></tr>'}</tbody></table>`;
+      document.getElementById('all-logs-table-container').innerHTML = `<table><thead><tr><th>シナリオ</th><th>PC名</th><th>技能</th><th>目標値</th><th>出目</th><th>結果 / 除外</th><th>集計操作</th></tr></thead><tbody>${tbodyHTML || '<tr><td colspan="7" style="text-align:center;">該当なし</td></tr>'}</tbody></table>`;
     }
     document.getElementById('btn-filter-logs').addEventListener('click', applyLogFilter);
+    document.getElementById('filter-log-exclusion').addEventListener('change', applyLogFilter);
+
+    window.saveRollOverride = function(sourceKey, analysisExcluded, savingsExcluded) {
+      if (!sourceKey || sourceKey === 'null') return alert('安定したsourceKeyがない判定は個別除外できません。');
+      const reason = prompt('除外理由（任意）:', '');
+      const tx = db.transaction(['rollOverrides'], 'readwrite');
+      const store = tx.objectStore('rollOverrides');
+      store.get(sourceKey).onsuccess = event => {
+        store.put(TRPGIdentity.buildRollOverride(sourceKey, { analysisExcluded, savingsExcluded, exclusionReason: reason || '' }, event.target.result));
+      };
+      tx.oncomplete = () => { renderAllDiceLogs(db); renderOverallAnalysis(db); renderSavings(db); };
+    };
 
     // --- Session Management UI ---
     async function renderSessionList(db) {
@@ -607,13 +765,15 @@
 
     async function loadPeopleData(db) {
       return new Promise(resolve => {
-        const tx = db.transaction(['aliasMappings', 'pcs', 'pls', 'rollRecords', 'sessions'], 'readonly');
-        let rolls = [], sessions = [];
+        const tx = db.transaction(['aliasMappings', 'pcs', 'pls', 'rollRecords', 'parsedItems', 'sessions', 'sessionParticipants'], 'readonly');
+        let rolls = [], parsedItems = [], sessions = [], participants = [];
         tx.objectStore('aliasMappings').getAll().onsuccess = e => currentAliasList = e.target.result;
         tx.objectStore('pcs').getAll().onsuccess = e => currentPcList = e.target.result;
         tx.objectStore('pls').getAll().onsuccess = e => currentPlList = e.target.result;
         tx.objectStore('rollRecords').getAll().onsuccess = e => rolls = e.target.result;
+        tx.objectStore('parsedItems').getAll().onsuccess = e => parsedItems = e.target.result;
         tx.objectStore('sessions').getAll().onsuccess = e => sessions = e.target.result;
+        tx.objectStore('sessionParticipants').getAll().onsuccess = e => participants = e.target.result;
         
         tx.oncomplete = () => {
           const plDisplay = document.getElementById('display-registered-pls');
@@ -621,16 +781,36 @@
           else { plDisplay.innerHTML = currentPlList.map(pl => `<span class="badge info">${pl.name}</span>`).join(' '); }
 
           const speakerToSessions = {};
-          rolls.forEach(r => { const norm = normalizeName(r.rawSpeaker); if (!speakerToSessions[norm]) speakerToSessions[norm] = new Set(); speakerToSessions[norm].add(r.sessionId); });
+          [...parsedItems.map(item => ({ rawSpeaker: item.rawSpeaker, sessionId: item.sessionId })), ...rolls.map(r => ({ rawSpeaker: r.rawSpeaker, sessionId: r.sessionId }))].forEach(entry => {
+            const norm = normalizeName(entry.rawSpeaker); if (!norm) return;
+            if (!speakerToSessions[norm]) speakerToSessions[norm] = new Set(); speakerToSessions[norm].add(entry.sessionId);
+          });
+          const globalMappings = new Map(currentAliasList.filter(mapping => (mapping.scope || 'global') === 'global').map(mapping => [normalizeName(mapping.rawSpeakerNormalized || mapping.rawNameNormalized), mapping]));
+          Object.keys(speakerToSessions).forEach(norm => {
+            if (!globalMappings.has(norm)) globalMappings.set(norm, { id: generateId(), rawNameNormalized: norm, rawSpeakerNormalized: norm, rawSpeakerExample: norm, pcId: null, ignored: false, scope: 'global', sessionId: null });
+          });
+          currentAliasList = Array.from(globalMappings.values());
+          const statusFilter = document.getElementById('people-status-filter').value;
 
           const tbody = document.getElementById('people-table-body');
           tbody.innerHTML = currentAliasList.map(alias => {
-            const pc = currentPcList.find(p => p.id === alias.pcId); const pl = pc ? currentPlList.find(p => p.id === pc.plId) : null;
-            const statusBadge = pc ? `<span class="badge success">整理済み</span>` : `<span class="badge warning">未整理</span>`;
-            const sIds = Array.from(speakerToSessions[alias.rawNameNormalized] || []);
-            const sTitles = sIds.map(id => sessions.find(s=>s.id===id)?.title || '不明').join(', ');
-            const actionBtn = pc ? `<button class="outline btn-pc-edit" data-id="${pc.id}" data-alias="${alias.rawNameNormalized}">編集</button>` : `<button class="btn-single-link" data-alias="${alias.rawNameNormalized}">紐付け</button>`;
-            return `<tr class="clickable-row"><td style="text-align: center;"><input type="checkbox" class="alias-checkbox" value="${alias.rawNameNormalized}"></td><td>${alias.rawNameNormalized}</td><td>${statusBadge}</td><td style="font-weight: bold;">${pc ? pc.name : '-'}</td><td>${pl ? pl.name : '-'}</td><td><span style="font-size:0.85em; color:#94a3b8;">${sTitles||'-'}</span></td><td>${actionBtn}</td></tr>`;
+            const norm = normalizeName(alias.rawSpeakerNormalized || alias.rawNameNormalized);
+            const pc = currentPcList.find(p => p.id === alias.pcId);
+            const pl = alias.plId ? currentPlList.find(p => p.id === alias.plId) : (pc ? currentPlList.find(p => p.id === pc.plId) : null);
+            const ignored = Boolean(alias.ignored);
+            const status = ignored ? 'ignored' : pc ? 'resolved' : 'unresolved';
+            if (statusFilter !== 'all' && statusFilter !== status) return '';
+            const statusBadge = ignored ? `<span class="badge info">整理対象外</span>` : pc ? `<span class="badge success">整理済み</span>` : `<span class="badge warning">未整理</span>`;
+            const sIds = Array.from(speakerToSessions[norm] || []);
+            const roleText = sIds.map(id => {
+              const participant = participants.find(p => p.sessionId === id && (p.rawSpeakerNormalized === norm || p.pcId === pc?.id));
+              const title = sessions.find(s => s.id === id)?.title || '不明';
+              return `${title}${participant?.role ? ` (${participant.role})` : ''}`;
+            }).join(', ');
+            const examples = [...parsedItems.map(item => item.rawSpeaker), ...rolls.map(r => r.rawSpeaker)].filter(raw => normalizeName(raw) === norm);
+            const candidateNames = currentPcList.filter(candidate => normalizeName(candidate.name) === norm || (candidate.aliases || []).some(aliasName => normalizeName(aliasName) === norm)).map(candidate => candidate.name);
+            const actionBtn = pc ? `<button class="outline btn-pc-edit" data-id="${pc.id}" data-alias="${norm}">編集</button>` : `<button class="btn-single-link" data-alias="${norm}">紐付け</button>`;
+            return `<tr class="clickable-row"><td style="text-align: center;"><input type="checkbox" class="alias-checkbox" value="${norm}"></td><td>${examples[0] || alias.rawSpeakerExample || norm}</td><td><span style="font-size:0.85em; color:#94a3b8;">${norm} / ${examples.length || 0}件</span>${candidateNames.length ? `<br><span class="badge info">候補: ${candidateNames.join(', ')}</span>` : ''}</td><td>${statusBadge}</td><td style="font-weight: bold;">${pc ? pc.name : '-'}</td><td>${pl ? pl.name : '-'}</td><td><span style="font-size:0.85em; color:#94a3b8;">${roleText || sIds.map(id => sessions.find(s=>s.id===id)?.title || '不明').join(', ') || '-'}</span></td><td>${actionBtn} <button class="outline btn-role-edit" data-alias="${norm}">役割</button>${ignored ? `<button class="outline btn-unignore" data-alias="${norm}">戻す</button>` : `<button class="outline btn-ignore" data-alias="${norm}">対象外</button>`}</td></tr>`;
           }).join('');
           
           document.getElementById('check-all-aliases').checked = false; lastCheckedIndex = null; updateBatchButtonState(); renderSettingsPlList(); resolve();
@@ -642,6 +822,9 @@
       if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
         if (e.target.classList.contains('btn-single-link')) openLinkModal(e.target.dataset.alias);
         if (e.target.classList.contains('btn-pc-edit')) openPcEdit(e.target.dataset.id, e.target.dataset.alias);
+        if (e.target.classList.contains('btn-role-edit')) editSessionRole(e.target.dataset.alias);
+        if (e.target.classList.contains('btn-ignore')) setAliasIgnored(e.target.dataset.alias, true);
+        if (e.target.classList.contains('btn-unignore')) setAliasIgnored(e.target.dataset.alias, false);
         return;
       }
       const tr = e.target.closest('tr'); if (!tr) return;
@@ -656,10 +839,51 @@
     });
 
     document.getElementById('check-all-aliases').addEventListener('change', (e) => { document.querySelectorAll('.alias-checkbox').forEach(cb => cb.checked = e.target.checked); updateBatchButtonState(); });
-    document.getElementById('btn-create-pc').addEventListener('click', () => { const name = prompt('新しいPC名を入力してください:'); if (name) { db.transaction(['pcs'], 'readwrite').objectStore('pcs').add({ id: generateId(), name, plId: null, type: "PC", excludedFromSavings: false, memo: "", imageAssetId: null }).transaction.oncomplete = () => loadPeopleData(db); } });
-    function createNewPL(name) { if (!name) return; db.transaction(['pls'], 'readwrite').objectStore('pls').add({ id: generateId(), name, isSelf: false, memo: "" }).transaction.oncomplete = () => { loadPeopleData(db); }; }
+    document.getElementById('people-status-filter').addEventListener('change', () => loadPeopleData(db));
+    document.getElementById('btn-create-pc').addEventListener('click', () => { const name = prompt('新しいキャラクター名を入力してください:'); if (name) { const plOptions = currentPlList.map((pl, index) => `${index + 1}: ${pl.name}`).join('\n'); const plNumber = Number(prompt(`担当PL番号（0なら未設定）:\n${plOptions}`, '0')); const plId = plNumber > 0 && currentPlList[plNumber - 1] ? currentPlList[plNumber - 1].id : null; const now = new Date().toISOString(); db.transaction(['pcs'], 'readwrite').objectStore('pcs').add({ id: generateId(), name, plId, aliases: [], type: "CHARACTER", excludedFromSavings: false, memo: "", imageAssetId: null, createdAt: now, updatedAt: now }).transaction.oncomplete = () => loadPeopleData(db); } });
+    function createNewPL(name) { if (!name) return; const now = new Date().toISOString(); db.transaction(['pls'], 'readwrite').objectStore('pls').add({ id: generateId(), name, aliases: [], isSelf: false, memo: "", createdAt: now, updatedAt: now }).transaction.oncomplete = () => { loadPeopleData(db); }; }
     document.getElementById('btn-create-pl').addEventListener('click', () => { createNewPL(prompt('新しいPL名を入力してください:')); });
     document.getElementById('btn-create-pl-settings').addEventListener('click', () => { const input = document.getElementById('new-pl-name-settings'); createNewPL(input.value.trim()); input.value = ''; });
+
+    function setAliasIgnored(normalized, ignored) {
+      const tx = db.transaction(['aliasMappings'], 'readwrite');
+      const store = tx.objectStore('aliasMappings');
+      store.get(normalized).onsuccess = event => {
+        const mapping = event.target.result || { id: generateId(), rawNameNormalized: normalized, rawSpeakerNormalized: normalized, pcId: null, scope: 'global', sessionId: null, createdAt: new Date().toISOString() };
+        mapping.ignored = Boolean(ignored); mapping.updatedAt = new Date().toISOString(); store.put(mapping);
+      };
+      tx.oncomplete = () => loadPeopleData(db);
+    }
+
+    async function editSessionRole(normalized) {
+      const read = (stores, names) => new Promise((resolve, reject) => {
+        const tx = db.transaction(stores, 'readonly'); const result = {};
+        names.forEach(name => tx.objectStore(name).getAll().onsuccess = e => { result[name] = e.target.result; });
+        tx.oncomplete = () => resolve(result); tx.onerror = () => reject(tx.error);
+      });
+      const data = await read(['sessions', 'aliasMappings', 'sessionParticipants'], ['sessions', 'aliasMappings', 'sessionParticipants']);
+      const sessions = data.sessions || [];
+      if (!sessions.length) return alert('先にログを読み込んでください。');
+      const selected = Number(prompt(`役割を設定するsession番号を入力してください。\n${sessions.map((session, index) => `${index + 1}: ${session.title}`).join('\n')}`));
+      const session = sessions[selected - 1]; if (!session) return;
+      const role = (prompt('roleを入力してください（PC / KPC / GM）:', 'PC') || '').toUpperCase();
+      if (!['PC', 'KPC', 'GM'].includes(role)) return alert('roleはPC、KPC、GMのいずれかです。');
+      const pcChoices = currentPcList.map((pc, index) => `${index + 1}: ${pc.name}`).join('\n');
+      const pcNumber = role === 'GM' ? 0 : Number(prompt(`このsessionで使う正式キャラクター番号（0なら全体設定）:\n${pcChoices}`, '0'));
+      const selectedPc = pcNumber > 0 ? currentPcList[pcNumber - 1] : null;
+      if (role !== 'GM' && pcNumber > 0 && !selectedPc) return alert('キャラクター番号が不正です。');
+      const savingsExcluded = confirm('このsessionでは貯金集計から除外しますか？');
+      const mapping = (data.aliasMappings || []).find(item => (item.scope || 'global') === 'global' && normalizeName(item.rawSpeakerNormalized || item.rawNameNormalized) === normalized) || {};
+      const existing = (data.sessionParticipants || []).find(item => item.sessionId === session.id && item.rawSpeakerNormalized === normalized);
+      const sessionPcId = role === 'GM' ? null : (selectedPc?.id || mapping.pcId || null);
+      const sessionPc = sessionPcId ? currentPcList.find(pc => pc.id === sessionPcId) : null;
+      const participant = { ...(existing || {}), id: existing?.id || generateId(), sessionId: session.id, rawSpeakerNormalized: normalized, pcId: sessionPcId, plId: sessionPc?.plId || mapping.plId || null, role, savingsExcluded, memo: existing?.memo || '', createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+      const key = `${normalized}::session:${session.id}`;
+      const tx = db.transaction(['sessionParticipants', 'aliasMappings'], 'readwrite');
+      tx.objectStore('sessionParticipants').put(participant);
+      tx.objectStore('aliasMappings').put({ id: `${mapping.id || generateId()}::session:${session.id}`, rawNameNormalized: key, rawSpeakerNormalized: normalized, rawSpeakerExample: mapping.rawSpeakerExample || normalized, pcId: participant.pcId, plId: participant.plId, scope: 'session', sessionId: session.id, ignored: false, createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
+      tx.oncomplete = () => loadPeopleData(db);
+    }
 
     let activeAliasNames = [];
     window.openLinkModal = function(singleAlias) {
@@ -679,16 +903,16 @@
     document.getElementById('btn-create-individual-link').addEventListener('click', () => {
       const plId = document.getElementById('link-pc-pl').value || null; const tx = db.transaction(['pcs', 'aliasMappings'], 'readwrite'); const pcStore = tx.objectStore('pcs'); const aliasStore = tx.objectStore('aliasMappings');
       activeAliasNames.forEach(aliasName => {
-        const newPcId = generateId(); pcStore.add({ id: newPcId, name: aliasName, plId: plId, type: "PC", excludedFromSavings: false, memo: "", imageAssetId: null });
-        aliasStore.get(aliasName).onsuccess = e => { if (e.target.result) { e.target.result.pcId = newPcId; aliasStore.put(e.target.result); } };
+        const newPcId = generateId(); const now = new Date().toISOString(); pcStore.add({ id: newPcId, name: aliasName, plId: plId, aliases: [aliasName], type: "CHARACTER", excludedFromSavings: false, memo: "", imageAssetId: null, createdAt: now, updatedAt: now });
+        aliasStore.get(aliasName).onsuccess = e => { const mapping = e.target.result || { id: generateId(), rawNameNormalized: aliasName, rawSpeakerNormalized: aliasName, rawSpeakerExample: aliasName, scope: 'global', sessionId: null, ignored: false, createdAt: new Date().toISOString() }; mapping.pcId = newPcId; mapping.plId = plId; mapping.updatedAt = new Date().toISOString(); aliasStore.put(mapping); };
       });
       tx.oncomplete = () => { document.getElementById('link-modal-wrapper').classList.add('hidden'); loadPeopleData(db); };
     });
 
     function applyPcLink(aliasNames, pcId, plId) {
       const tx = db.transaction(['aliasMappings', 'pcs'], 'readwrite');
-      if (pcId && plId) { tx.objectStore('pcs').get(pcId).onsuccess = e => { if (e.target.result) { e.target.result.plId = plId; tx.objectStore('pcs').put(e.target.result); } }; }
-      aliasNames.forEach(name => { tx.objectStore('aliasMappings').get(name).onsuccess = e => { if (e.target.result) { e.target.result.pcId = pcId; tx.objectStore('aliasMappings').put(e.target.result); } }; });
+      if (pcId && plId) { tx.objectStore('pcs').get(pcId).onsuccess = e => { if (e.target.result) { e.target.result.plId = plId; e.target.result.updatedAt = new Date().toISOString(); tx.objectStore('pcs').put(e.target.result); } }; }
+      aliasNames.forEach(name => { tx.objectStore('aliasMappings').get(name).onsuccess = e => { const mapping = e.target.result || { id: generateId(), rawNameNormalized: name, rawSpeakerNormalized: name, rawSpeakerExample: name, scope: 'global', sessionId: null, ignored: false, createdAt: new Date().toISOString() }; mapping.pcId = pcId; mapping.plId = plId; mapping.ignored = false; mapping.updatedAt = new Date().toISOString(); tx.objectStore('aliasMappings').put(mapping); }; });
       tx.oncomplete = () => { document.getElementById('link-modal-wrapper').classList.add('hidden'); loadPeopleData(db); };
     }
 
@@ -711,12 +935,20 @@
       tx.objectStore('aliasMappings').get(editingAliasName).onsuccess = e => { if (e.target.result) { e.target.result.pcId = null; tx.objectStore('aliasMappings').put(e.target.result); } };
       tx.oncomplete = () => { document.getElementById('pc-edit-modal-wrapper').classList.add('hidden'); loadPeopleData(db); };
     });
+    document.getElementById('btn-delete-pc').addEventListener('click', () => {
+      if (!editingPcId || !confirm('PCを削除しますか？\nログと判定記録は残し、人物紐付けだけ解除します。')) return;
+      const tx = db.transaction(['pcs', 'aliasMappings', 'sessionParticipants'], 'readwrite');
+      tx.objectStore('pcs').delete(editingPcId);
+      tx.objectStore('aliasMappings').getAll().onsuccess = e => e.target.result.forEach(mapping => { if (mapping.pcId === editingPcId) { mapping.pcId = null; mapping.updatedAt = new Date().toISOString(); tx.objectStore('aliasMappings').put(mapping); } });
+      tx.objectStore('sessionParticipants').getAll().onsuccess = e => e.target.result.forEach(participant => { if (participant.pcId === editingPcId) { participant.pcId = null; participant.updatedAt = new Date().toISOString(); tx.objectStore('sessionParticipants').put(participant); } });
+      tx.oncomplete = () => { document.getElementById('pc-edit-modal-wrapper').classList.add('hidden'); loadPeopleData(db); renderOverallAnalysis(db); renderSavings(db); };
+    });
     document.getElementById('btn-save-pc-info').addEventListener('click', () => {
       const selectedPcId = document.getElementById('edit-pc-id-value').value, selectedPlId = document.getElementById('edit-pc-pl').value || null, excluded = document.getElementById('edit-pc-excluded').checked;
       if (!selectedPcId) return alert('紐付け先PCを選択してください。');
       const tx = db.transaction(['pcs', 'aliasMappings'], 'readwrite');
-      tx.objectStore('pcs').get(selectedPcId).onsuccess = e => { const pc = e.target.result; if(pc) { pc.plId = selectedPlId; pc.excludedFromSavings = excluded; tx.objectStore('pcs').put(pc); } };
-      tx.objectStore('aliasMappings').get(editingAliasName).onsuccess = e => { if (e.target.result) { e.target.result.pcId = selectedPcId; tx.objectStore('aliasMappings').put(e.target.result); } };
+      tx.objectStore('pcs').get(selectedPcId).onsuccess = e => { const pc = e.target.result; if(pc) { pc.plId = selectedPlId; pc.excludedFromSavings = excluded; pc.updatedAt = new Date().toISOString(); tx.objectStore('pcs').put(pc); } };
+      tx.objectStore('aliasMappings').get(editingAliasName).onsuccess = e => { const mapping = e.target.result || { id: generateId(), rawNameNormalized: editingAliasName, rawSpeakerNormalized: editingAliasName, rawSpeakerExample: editingAliasName, scope: 'global', sessionId: null, ignored: false, createdAt: new Date().toISOString() }; mapping.pcId = selectedPcId; mapping.plId = selectedPlId; mapping.ignored = false; mapping.updatedAt = new Date().toISOString(); tx.objectStore('aliasMappings').put(mapping); };
       tx.oncomplete = () => { document.getElementById('pc-edit-modal-wrapper').classList.add('hidden'); loadPeopleData(db); };
     });
 
@@ -726,8 +958,8 @@
       tbody.innerHTML = currentPlList.map(pl => `<tr><td style="font-weight:bold;">${pl.name} ${pl.id === myPlId ? '<span class="badge success">自分のPL</span>' : ''}</td><td><button class="outline" onclick="renamePl('${pl.id}')" style="padding: 4px 8px; font-size: 0.85em;">名前変更</button> <button class="danger" onclick="deletePl('${pl.id}')" style="padding: 4px 8px; font-size: 0.85em;">削除</button></td></tr>`).join('');
       select.innerHTML = '<option value="">-- 未設定 --</option>' + currentPlList.map(pl => `<option value="${pl.id}">${pl.name}</option>`).join(''); select.value = myPlId || '';
     }
-    window.renamePl = function(id) { const pl = currentPlList.find(p => p.id === id); const newName = prompt('PLの新しい名前:', pl.name); if (newName && newName !== pl.name) { const tx = db.transaction(['pls'], 'readwrite'); tx.objectStore('pls').get(id).onsuccess = e => { e.target.result.name = newName; tx.objectStore('pls').put(e.target.result); }; tx.oncomplete = () => loadPeopleData(db); } };
-    window.deletePl = function(id) { if(confirm('このPLを削除しますか？\n（PCとの紐付けは解除されますが、ログ自体は消えません）')) { const tx = db.transaction(['pls', 'pcs'], 'readwrite'); tx.objectStore('pls').delete(id); tx.objectStore('pcs').getAll().onsuccess = e => { e.target.result.forEach(pc => { if(pc.plId === id) { pc.plId = null; tx.objectStore('pcs').put(pc); } }); }; tx.oncomplete = () => loadPeopleData(db); } };
+    window.renamePl = function(id) { const pl = currentPlList.find(p => p.id === id); const newName = prompt('PLの新しい名前:', pl.name); if (newName && newName !== pl.name) { const tx = db.transaction(['pls'], 'readwrite'); tx.objectStore('pls').get(id).onsuccess = e => { const value = e.target.result; value.name = newName; value.updatedAt = new Date().toISOString(); tx.objectStore('pls').put(value); }; tx.oncomplete = () => loadPeopleData(db); } };
+    window.deletePl = function(id) { if(confirm('このPLを削除しますか？\n（PCとの紐付けは解除されますが、ログ自体は消えません）')) { const tx = db.transaction(['pls', 'pcs', 'sessionParticipants', 'aliasMappings'], 'readwrite'); tx.objectStore('pls').delete(id); tx.objectStore('pcs').getAll().onsuccess = e => { e.target.result.forEach(pc => { if(pc.plId === id) { pc.plId = null; pc.updatedAt = new Date().toISOString(); tx.objectStore('pcs').put(pc); } }); }; tx.objectStore('sessionParticipants').getAll().onsuccess = e => { e.target.result.forEach(participant => { if (participant.plId === id) { participant.plId = null; participant.updatedAt = new Date().toISOString(); tx.objectStore('sessionParticipants').put(participant); } }); }; tx.objectStore('aliasMappings').getAll().onsuccess = e => { e.target.result.forEach(mapping => { if (mapping.plId === id) { mapping.plId = null; mapping.updatedAt = new Date().toISOString(); tx.objectStore('aliasMappings').put(mapping); } }); }; tx.oncomplete = () => loadPeopleData(db); } };
     document.getElementById('btn-save-my-pl').addEventListener('click', () => { myPlId = document.getElementById('setting-my-pl').value; localStorage.setItem('myPlId', myPlId); alert('自分のPL設定を保存しました。'); loadPeopleData(db); renderSavings(db); });
 
     // --- Savings Rules UI ---
@@ -899,15 +1131,22 @@
     
     async function renderOverallAnalysis(db) {
       return new Promise(resolve => {
-        const tx = db.transaction(['rollRecords', 'sessions', 'pcs', 'aliasMappings'], 'readonly');
-        let rolls = [], sessions = [], pcs = [], aliases = [];
+        const tx = db.transaction(['rollRecords', 'sessions', 'pcs', 'pls', 'aliasMappings', 'sessionParticipants', 'rollOverrides'], 'readonly');
+        let rolls = [], sessions = [], pcs = [], pls = [], aliases = [], participants = [], overrides = [];
         tx.objectStore('rollRecords').getAll().onsuccess = e => rolls = e.target.result;
         tx.objectStore('sessions').getAll().onsuccess = e => sessions = e.target.result;
         tx.objectStore('pcs').getAll().onsuccess = e => pcs = e.target.result;
+        tx.objectStore('pls').getAll().onsuccess = e => pls = e.target.result;
         tx.objectStore('aliasMappings').getAll().onsuccess = e => aliases = e.target.result;
+        tx.objectStore('sessionParticipants').getAll().onsuccess = e => participants = e.target.result;
+        tx.objectStore('rollOverrides').getAll().onsuccess = e => overrides = e.target.result;
         
         tx.oncomplete = () => {
-          const judgements = rolls.filter(r => r.isJudgement && r.result !== 'unknown');
+          const resolvedRolls = TRPGIdentity.applyRollOverrides(rolls, overrides);
+          const judgements = resolvedRolls.filter(r => {
+            if (!r.isJudgement || r.result === 'unknown' || r.analysisExcluded) return false;
+            return !TRPGIdentity.resolveSpeaker({ rawSpeaker: r.rawSpeaker, sessionId: r.sessionId, mappings: aliases, pcs, pls, sessionParticipants: participants }).ignored;
+          });
           const stats = calculateStats(judgements);
           
           if (judgements.length === 0) {
@@ -923,12 +1162,9 @@
             <div><p style="margin:0; color:#94a3b8; font-size:0.9em;">ファンブル率</p><h2 style="color:var(--danger);">${stats.fumbleRate.toFixed(1)}%</h2></div>
           </div>`;
           
-          const aliasDict = {};
-          aliases.forEach(a => aliasDict[a.rawNameNormalized] = a.pcId);
-          
           const pcStats = {};
           judgements.forEach(r => {
-            const pcId = aliasDict[normalizeName(r.rawSpeaker)];
+            const pcId = TRPGIdentity.resolveSpeaker({ rawSpeaker: r.rawSpeaker, sessionId: r.sessionId, mappings: aliases, pcs, pls, sessionParticipants: participants }).pcId;
             if (pcId) {
               if (!pcStats[pcId]) pcStats[pcId] = { id: pcId, rolls: [] };
               pcStats[pcId].rolls.push(r);
@@ -949,12 +1185,15 @@
     // --- ★ リッチなSavings Engine ---
     async function renderSavings(db) {
       return new Promise(resolve => {
-        const tx = db.transaction(['rollRecords', 'pcs', 'aliasMappings', 'sessions', 'savingsRules', 'ledgerEntries'], 'readonly');
-        let rolls = [], pcs = [], aliases = [], sessions = [], rules = [], ledger = [];
+        const tx = db.transaction(['rollRecords', 'pcs', 'pls', 'aliasMappings', 'sessions', 'sessionParticipants', 'rollOverrides', 'savingsRules', 'ledgerEntries'], 'readonly');
+        let rolls = [], pcs = [], pls = [], aliases = [], sessions = [], participants = [], overrides = [], rules = [], ledger = [];
         tx.objectStore('rollRecords').getAll().onsuccess = e => rolls = e.target.result;
         tx.objectStore('pcs').getAll().onsuccess = e => pcs = e.target.result;
+        tx.objectStore('pls').getAll().onsuccess = e => pls = e.target.result;
         tx.objectStore('aliasMappings').getAll().onsuccess = e => aliases = e.target.result;
         tx.objectStore('sessions').getAll().onsuccess = e => sessions = e.target.result;
+        tx.objectStore('sessionParticipants').getAll().onsuccess = e => participants = e.target.result;
+        tx.objectStore('rollOverrides').getAll().onsuccess = e => overrides = e.target.result;
         tx.objectStore('savingsRules').getAll().onsuccess = e => rules = e.target.result;
         tx.objectStore('ledgerEntries').getAll().onsuccess = e => ledger = e.target.result;
         
@@ -1002,16 +1241,15 @@
             if (entry.details) entry.details.forEach(d => { if (d.rollId && d.ruleId) savedCombos.add(d.rollId + '_' + d.ruleId); });
           });
 
-          const aliasDict = {};
-          aliases.forEach(a => aliasDict[a.rawNameNormalized] = a.pcId);
-          
           const candidatesBySession = {};
           
-          rolls.filter(r => r.isJudgement && r.result !== 'unknown').forEach(r => {
-            const pcId = aliasDict[normalizeName(r.rawSpeaker)];
-            if (!pcId) return;
+          TRPGIdentity.applyRollOverrides(rolls.filter(r => r.isJudgement && r.result !== 'unknown'), overrides).forEach(r => {
+            if (r.savingsExcluded) return;
+            const resolved = TRPGIdentity.resolveSpeaker({ rawSpeaker: r.rawSpeaker, sessionId: r.sessionId, mappings: aliases, pcs, pls, sessionParticipants: participants });
+            const pcId = resolved.pcId;
+            if (resolved.ignored || !pcId || resolved.sessionParticipant?.savingsExcluded) return;
             const pc = pcs.find(p => p.id === pcId);
-            if (!pc || pc.plId !== myPlId || pc.excludedFromSavings) return;
+            if (!pc || (resolved.plId || pc.plId) !== myPlId) return;
 
             rules.filter(ru => ru.isEnabled).forEach(rule => {
               if (savedCombos.has(r.id + '_' + rule.id)) return;
