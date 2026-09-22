@@ -50,6 +50,7 @@ test('failure margin -1 creates close failure only', () => {
   const rows = incidentsFor([roll('r1', { result: 'failure', targetValue: 50, rolledValue: 51 })]);
   assert.equal(detector(rows, 'close-failure').length, 1); assert.equal(detector(rows, 'close-success').length, 0);
 });
+test('failure margin -2 is not mislabeled as anあと1 incident', () => assert.equal(detector(incidentsFor([roll('r1', { result: 'failure', targetValue: 50, rolledValue: 52 })]), 'close-failure').length, 0));
 test('success margin 0 and +2 are close successes, +3 is not', () => {
   const rows = incidentsFor([roll('r1', { targetValue: 50, rolledValue: 50 }), roll('r2', { targetValue: 50, rolledValue: 48, sequenceInSession: 2 }), roll('r3', { targetValue: 50, rolledValue: 47, sequenceInSession: 3 })]);
   assert.equal(detector(rows, 'close-success').length, 2);

@@ -135,7 +135,7 @@
 
   registerIncidentDetector({ id: 'close-failure', title: 'あと1だった', category: INCIDENT_CATEGORIES.margin, minimumSampleSize: 1, detect(context, options) {
     const threshold = Number(options.closeSuccessMargin);
-    return visibleRolls(context).filter(roll => roll.isJudgement && resultOf(roll) === 'failure' && marginOf(roll) !== null && marginOf(roll) >= -threshold && marginOf(roll) < 0).map(roll => baseIncident('close-failure', 'margin', roll, context, { title: 'あと1だった', evidence: { margin: marginOf(roll), threshold, result: resultOf(roll) }, description: '失敗したが目標値まであとわずか' }));
+      return visibleRolls(context).filter(roll => roll.isJudgement && resultOf(roll) === 'failure' && marginOf(roll) === -1).map(roll => baseIncident('close-failure', 'margin', roll, context, { title: 'あと1だった', evidence: { margin: -1, threshold, result: resultOf(roll) }, description: '失敗したが目標値まであと1' }));
   } });
   registerIncidentDetector({ id: 'close-success', title: 'ギリギリ成功', category: INCIDENT_CATEGORIES.margin, minimumSampleSize: 1, detect(context, options) {
     const threshold = Number(options.closeSuccessMargin);
