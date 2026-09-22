@@ -104,9 +104,10 @@ function main() {
   const totals = logs.reduce((sum, log) => {
     for (const key of ['messageCount', 'rollRecords', 'judgementRolls', 'nonJudgementDice', 'status', 'message', 'unknown', 'candidateCount', 'sessionCandidateCount', 'sanChecks', 'multiRollMessages', 'targetMissing', 'judgementRolledMissing', 'sourceKeyMissing', 'candidateKeyDuplicates', 'savingsExcludedCount']) sum[key] += log[key];
     for (const [key, value] of Object.entries(log.roleCandidateCounts)) add(sum.roleCandidateCounts, key, value);
+    add(sum.sessionCandidateDistribution, String(log.sessionCandidateCount), 1);
     for (const [key, value] of Object.entries(log.ruleHits)) add(sum.ruleHits, key, value);
     return sum;
-  }, { logCount: logs.length, messageCount: 0, rollRecords: 0, judgementRolls: 0, nonJudgementDice: 0, status: 0, message: 0, unknown: 0, candidateCount: 0, sessionCandidateCount: 0, sanChecks: 0, multiRollMessages: 0, targetMissing: 0, judgementRolledMissing: 0, sourceKeyMissing: 0, candidateKeyDuplicates: 0, savingsExcludedCount: 0, roleCandidateCounts: { PC: 0, KPC: 0, GM: 0, unresolved: 0 }, ruleHits: {} });
+  }, { logCount: logs.length, messageCount: 0, rollRecords: 0, judgementRolls: 0, nonJudgementDice: 0, status: 0, message: 0, unknown: 0, candidateCount: 0, sessionCandidateCount: 0, sessionCandidateDistribution: {}, sanChecks: 0, multiRollMessages: 0, targetMissing: 0, judgementRolledMissing: 0, sourceKeyMissing: 0, candidateKeyDuplicates: 0, savingsExcludedCount: 0, roleCandidateCounts: { PC: 0, KPC: 0, GM: 0, unresolved: 0 }, ruleHits: {} });
   console.log(JSON.stringify({ parserVersion: parser.PARSER_VERSION, logs, totals, notes: { inputPathsAreLocalOnly: true, rulesAreSyntheticForCoverage: true, roleResolutionRequiresUserMappings: true } }, null, 2));
 }
 
