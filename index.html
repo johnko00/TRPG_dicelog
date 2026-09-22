@@ -145,7 +145,7 @@
     .dashboard-event-meta { color:#94a3b8; font-size:.84rem; margin-top:5px; }
     .dashboard-session-image { width:48px; height:48px; border-radius:12px; object-fit:cover; float:right; border:1px solid rgba(255,255,255,.2); }
     @media (max-width: 800px) { .dashboard-stat-grid { grid-template-columns: repeat(2, 1fr); } .calendar-grid { gap:5px; } .dashboard-calendar-day { min-height:95px; padding:6px; } .dashboard-session-card { font-size:.68rem; padding:4px; } }
-    /* === Phase 5A-1 analysis foundation === */
+    /* === Phase 5 analysis foundation and modules === */
     .analysis-filter-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
     .analysis-filter-field { display:flex; flex-direction:column; gap:6px; color:#cbd5e1; font-size:.85rem; }
     .analysis-filter-field select { min-height:44px; }
@@ -157,6 +157,28 @@
     .analysis-stat-card { background:rgba(0,0,0,.18); border-radius:14px; padding:14px; border:1px solid rgba(255,255,255,.06); }
     .analysis-stat-card small { display:block; color:#94a3b8; }
     .analysis-stat-card strong { display:block; color:#fff; font-size:1.55rem; margin-top:4px; }
+    .analysis-section-title { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .analysis-section-title small { color:#94a3b8; font-weight:400; }
+    .analysis-bar-chart { display:grid; grid-template-columns:repeat(10,minmax(34px,1fr)); gap:8px; align-items:end; min-height:190px; padding:12px 4px 0; }
+    .analysis-bar-column { display:flex; flex-direction:column; align-items:stretch; justify-content:flex-end; min-width:0; height:175px; }
+    .analysis-bar-track { height:145px; display:flex; align-items:flex-end; justify-content:center; }
+    .analysis-bar { width:76%; min-height:2px; border-radius:8px 8px 2px 2px; background:linear-gradient(180deg,#fb7185,#c026d3); outline:none; }
+    .analysis-bar:focus, .analysis-bar:hover { box-shadow:0 0 0 2px rgba(255,255,255,.75); }
+    .analysis-bar-label { text-align:center; color:#cbd5e1; font-size:.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:5px; }
+    .analysis-table-wrap { overflow-x:auto; }
+    .analysis-table-wrap table { min-width:680px; }
+    .analysis-subgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; }
+    .analysis-comparison-grid { display:grid; grid-template-columns:repeat(3,minmax(150px,1fr)); gap:10px; align-items:end; }
+    .analysis-comparison-grid label { display:flex; flex-direction:column; gap:5px; color:#cbd5e1; font-size:.82rem; }
+    .analysis-compare-metric { display:grid; grid-template-columns:minmax(110px,1.3fr) repeat(3,minmax(80px,1fr)); gap:8px; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.06); }
+    .analysis-compare-metric strong { color:#fff; }
+    .analysis-compare-delta { color:#fda4af; }
+    .analysis-compare-bars { display:grid; gap:9px; margin-top:16px; }
+    .analysis-compare-bar-row { display:grid; grid-template-columns:90px 1fr 58px; gap:8px; align-items:center; color:#cbd5e1; font-size:.78rem; }
+    .analysis-compare-bar-track { display:grid; gap:3px; }
+    .analysis-compare-bar-track span { display:block; height:8px; border-radius:99px; background:linear-gradient(90deg,#fb7185,#c026d3); }
+    .analysis-compare-bar-track span:last-child { background:linear-gradient(90deg,#60a5fa,#22d3ee); }
+    @media (max-width: 700px) { .analysis-bar-chart { gap:3px; } .analysis-bar-label { font-size:.6rem; } .analysis-comparison-grid { grid-template-columns:1fr; } .analysis-compare-metric { grid-template-columns:1fr repeat(3,minmax(58px,1fr)); font-size:.82rem; } }
     .play-group-color { width:1.1em; height:1.1em; border-radius:50%; display:inline-block; vertical-align:-.15em; margin-right:5px; border:1px solid rgba(255,255,255,.35); }
 
   </style>
@@ -1318,6 +1340,8 @@
     // --- Phase 5A-1 shared filter UI ---
     let analysisContextCache = null;
     let analysisFilterState = TRPGAnalysis.normalizeAnalysisFilter();
+    let analysisComparisonState = { enabled: false, dimension: 'role', a: 'PC', b: 'KPC', periodAFrom: null, periodATo: null, periodBFrom: null, periodBTo: null };
+    let analysisSkillSortState = { sortBy: 'usageCount', minimumSampleSize: 5, openSkillKey: null };
     const analysisFilterLabels = { plIds: 'PL', pcIds: 'PC', sessionIds: 'シナリオ', playGroupIds: 'グループ', roles: 'role', systems: 'system', skills: '技能', skillCategories: '技能カテゴリ' };
 
     function phase5ReadAnalysisData(database) {
@@ -1400,13 +1424,124 @@
       }
     }
 
+    function phase5FormatRate(value) { return Number.isFinite(Number(value)) ? (Number(value) * 100).toFixed(1) + '%' : '-'; }
+    function phase5FormatNumber(value, digits) { return value == null || !Number.isFinite(Number(value)) ? '-' : Number(value).toFixed(digits == null ? 1 : digits); }
+    function phase5MetricCard(label, value, note, color) { return '<div class="analysis-stat-card"><small>' + phase4Escape(label) + '</small><strong' + (color ? ' style="color:' + color + ';"' : '') + '>' + phase4Escape(String(value)) + '</strong>' + (note ? '<small>' + phase4Escape(String(note)) + '</small>' : '') + '</div>'; }
+
+    function phase5RenderSummary(stats) {
+      const average = stats.averageRoll == null ? '-' : phase5FormatNumber(stats.averageRoll) + ' (' + stats.averageRollSampleCount + '件)';
+      return '<div class="card"><div class="analysis-section-title"><h2>サマリー</h2><small>成功率は分類可能な判定のみ</small></div><div class="analysis-stats-grid">' +
+        phase5MetricCard('対象卓', stats.sessionCount) + phase5MetricCard('総dice数', stats.rollCount) +
+        phase5MetricCard('判定数', stats.judgementCount, '分類済 ' + stats.classifiedJudgementCount + '件') +
+        phase5MetricCard('成功率', phase5FormatRate(stats.successRate), stats.success + ' / ' + stats.successRateDenominator, 'var(--success)') +
+        phase5MetricCard('成功', stats.success) + phase5MetricCard('失敗', stats.failure) +
+        phase5MetricCard('Critical', stats.critical, phase5FormatRate(stats.criticalRate), '#fde047') +
+        phase5MetricCard('Fumble', stats.fumble, phase5FormatRate(stats.fumbleRate), '#d8b4fe') +
+        phase5MetricCard('平均出目', average) + phase5MetricCard('出目1', stats.exact1, 'numeric判定 ' + stats.numericJudgementSampleCount + '件') +
+        phase5MetricCard('出目100', stats.exact100) + '</div><p style="color:#94a3b8;font-size:.85rem;margin-bottom:0;">平均出目・出目1/100の分母はnumericな判定出目です。unknown判定 ' + stats.unknownJudgementCount + '件は成功率から除外しています。</p></div>';
+    }
+
+    function phase5RenderDistribution(filtered) {
+      const distribution = TRPGAnalysis.calculateRollDistribution(filtered, { bucketSize: 10 });
+      const sampleCount = distribution.sampleCount || 0;
+      const peak = Math.max(1, ...distribution.map(bucket => bucket.count));
+      const bars = distribution.map(bucket => {
+        const percentage = sampleCount ? (bucket.count / sampleCount * 100).toFixed(1) : '0.0';
+        const height = bucket.count ? Math.max(3, bucket.count / peak * 100) : 0;
+        const label = bucket.min + '–' + bucket.max;
+        return '<div class="analysis-bar-column"><div class="analysis-bar-track"><span class="analysis-bar" tabindex="0" style="height:' + height + '%" title="' + phase4Escape(label + ': ' + bucket.count + '件 (' + percentage + '%)') + '" aria-label="' + phase4Escape(label + ' ' + bucket.count + '件 ' + percentage + '%') + '"></span></div><div class="analysis-bar-label">' + phase4Escape(label) + '<br><strong>' + bucket.count + '</strong></div></div>';
+      }).join('');
+      return '<div class="card"><div class="analysis-section-title"><h2>出目分布</h2><small>d100 / numeric判定 ' + sampleCount + '件</small></div>' + (sampleCount ? '<div class="analysis-bar-chart" role="img" aria-label="d100出目分布">' + bars + '</div>' : '<div class="dashboard-empty">numericな判定出目がありません。</div>') + '</div>';
+    }
+
+    function phase5SkillRows(rows) {
+      return rows.map(row => {
+        const details = row.recentRecords.length ? '<details class="analysis-skill-details"><summary>直近' + row.recentRecords.length + '件</summary><div class="analysis-table-wrap"><table><thead><tr><th>session</th><th>日付</th><th>PC</th><th>role</th><th>target</th><th>roll</th><th>result</th></tr></thead><tbody>' + row.recentRecords.map(record => '<tr><td>' + phase4Escape(record.sessionTitle || record.sessionId || '-') + '</td><td>' + phase4Escape(record.sessionDate || '-') + '</td><td>' + phase4Escape(record.pcName || record.pcId || '-') + '</td><td>' + phase4Escape(record.role || '-') + '</td><td>' + phase4Escape(record.targetValue == null ? '-' : record.targetValue) + '</td><td>' + phase4Escape(record.rolledValue == null ? '-' : record.rolledValue) + '</td><td>' + phase4Escape(record.result || '-') + '</td></tr>').join('') + '</tbody></table></div></details>' : '';
+        return '<tr><td><strong>' + phase4Escape(row.displayName) + '</strong><br><small>' + phase4Escape(row.skillKey) + '</small>' + details + '</td><td>' + row.usageCount + '</td><td>' + row.classifiedCount + '</td><td>' + row.successCount + ' / ' + row.failureCount + '</td><td>' + phase5FormatRate(row.successRate) + '</td><td>' + row.criticalCount + ' (' + phase5FormatRate(row.criticalRate) + ')</td><td>' + row.fumbleCount + ' (' + phase5FormatRate(row.fumbleRate) + ')</td><td>' + phase5FormatNumber(row.averageRoll) + '</td><td>' + phase5FormatNumber(row.averageTarget) + '</td></tr>';
+      }).join('');
+    }
+
+    function phase5RenderSkillAnalysis(filtered) {
+      const allRows = TRPGAnalysis.calculateSkillStats(filtered, { sortBy: analysisSkillSortState.sortBy, recentLimit: 5 });
+      const rankingRows = allRows.filter(row => row.classifiedCount >= analysisSkillSortState.minimumSampleSize);
+      const rows = rankingRows.length ? rankingRows : allRows;
+      const note = rankingRows.length ? 'ランキングは分類済み判定 ' + analysisSkillSortState.minimumSampleSize + '回以上' : '最低判定数を満たす技能がないため全技能を表示';
+      const tableFor = values => values.length ? '<div class="analysis-table-wrap"><table><thead><tr><th>技能</th><th>使用</th><th>分類済</th><th>成功 / 失敗</th><th>成功率</th><th>Critical</th><th>Fumble</th><th>平均出目</th><th>平均target</th></tr></thead><tbody>' + phase5SkillRows(values) + '</tbody></table></div>' : '<div class="dashboard-empty">技能名を取得できる判定がありません。</div>';
+      const rankingTable = tableFor(rows);
+      const allTable = tableFor(allRows);
+      return '<div class="card"><div class="analysis-section-title"><h2>技能分析</h2><small>' + phase4Escape(note) + '</small></div><div class="analysis-filter-actions"><label>並び順 <select id="analysis-skill-sort"><option value="usageCount"' + (analysisSkillSortState.sortBy === 'usageCount' ? ' selected' : '') + '>使用回数順</option><option value="successRate"' + (analysisSkillSortState.sortBy === 'successRate' ? ' selected' : '') + '>成功率順</option><option value="criticalCount"' + (analysisSkillSortState.sortBy === 'criticalCount' ? ' selected' : '') + '>Critical順</option><option value="fumbleCount"' + (analysisSkillSortState.sortBy === 'fumbleCount' ? ' selected' : '') + '>Fumble順</option><option value="name"' + (analysisSkillSortState.sortBy === 'name' ? ' selected' : '') + '>技能名順</option></select></label><label>ランキング最低判定数 <input id="analysis-skill-min" type="number" min="1" step="1" value="' + analysisSkillSortState.minimumSampleSize + '" style="width:90px;"></label></div><h3>ランキング</h3>' + rankingTable + '<details style="margin-top:14px;\"><summary>全技能一覧（' + allRows.length + '技能）</summary>' + allTable + '</details></div>';
+    }
+
+    function phase5BreakdownTable(breakdown, title) {
+      const rows = breakdown.rows.slice(0, 30).map(row => '<tr><td>' + phase4Escape(row.label) + '</td><td>' + row.rollCount + '</td><td>' + row.judgementCount + '</td><td>' + phase5FormatRate(row.successRate) + '</td><td>' + row.critical + '</td><td>' + row.fumble + '</td><td>' + phase5FormatNumber(row.averageRoll) + '</td></tr>').join('');
+      return '<details class="card"><summary><strong>' + phase4Escape(title) + '</strong>（' + breakdown.rows.length + '件）</summary><div class="analysis-table-wrap" style="margin-top:12px;">' + (rows ? '<table><thead><tr><th>名前</th><th>dice</th><th>判定</th><th>成功率</th><th>Critical</th><th>Fumble</th><th>平均出目</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<div class="dashboard-empty">該当する内訳データがありません。</div>') + '</div></details>';
+    }
+
+    function phase5RenderBreakdowns(filtered) {
+      return '<div class="analysis-subgrid">' + phase5BreakdownTable(TRPGAnalysis.calculateBreakdown(filtered, 'pl'), 'PL別') + phase5BreakdownTable(TRPGAnalysis.calculateBreakdown(filtered, 'pc'), 'PC別') + phase5BreakdownTable(TRPGAnalysis.calculateBreakdown(filtered, 'session'), 'session別') + phase5BreakdownTable(TRPGAnalysis.calculateBreakdown(filtered, 'playGroup'), 'プレイグループ別') + phase5BreakdownTable(TRPGAnalysis.calculateBreakdown(filtered, 'role'), 'role別') + phase5BreakdownTable(TRPGAnalysis.calculateBreakdown(filtered, 'system'), 'system別') + '</div>';
+    }
+
+    function phase5ComparisonOptions(dimensions, dimension, selected) {
+      const map = { pl: dimensions.pls, pc: dimensions.pcs, session: dimensions.sessions, playGroup: dimensions.playGroups, role: dimensions.roleOptions, system: dimensions.systems };
+      const options = map[dimension] || [];
+      return options.filter(option => option.id !== TRPGAnalysis.UNGROUPED || dimension === 'playGroup').map(option => {
+        const value = option.id == null ? option.value : option.id;
+        const label = option.name || option.title || option.label || option.value || option.id;
+        return '<option value="' + phase4Escape(value) + '"' + (String(value) === String(selected) ? ' selected' : '') + '>' + phase4Escape(label) + '</option>';
+      }).join('');
+    }
+
+    function phase5BuildComparisonFilters() {
+      const state = analysisComparisonState;
+      if (state.dimension === 'period') return { a: { dateRange: { from: state.periodAFrom, to: state.periodATo } }, b: { dateRange: { from: state.periodBFrom, to: state.periodBTo } } };
+      const key = state.dimension === 'playGroup' ? 'playGroupIds' : state.dimension === 'session' ? 'sessionIds' : state.dimension === 'role' ? 'roles' : state.dimension === 'system' ? 'systems' : state.dimension === 'pl' ? 'plIds' : 'pcIds';
+      return { a: { [key]: state.a ? [state.a] : [] }, b: { [key]: state.b ? [state.b] : [] } };
+    }
+
+    function phase5ComparisonMetric(label, a, b, difference, formatter, emptyA, emptyB) {
+      const format = formatter || (value => value == null ? '-' : String(value));
+      return '<div class="analysis-compare-metric"><strong>' + phase4Escape(label) + '</strong><span>A ' + phase4Escape(emptyA ? 'データなし' : format(a)) + '</span><span>B ' + phase4Escape(emptyB ? 'データなし' : format(b)) + '</span><span class="analysis-compare-delta">差 ' + phase4Escape(format(difference)) + '</span></div>';
+    }
+
+    function phase5ComparisonBars(a, b) {
+      const rows = [
+        ['成功率', a.successRate, b.successRate, 1],
+        ['Critical率', a.criticalRate, b.criticalRate, 1],
+        ['Fumble率', a.fumbleRate, b.fumbleRate, 1],
+        ['平均出目', a.averageRoll, b.averageRoll, 100]
+      ];
+      return '<div class="analysis-compare-bars" aria-label="AとBの比較グラフ">' + rows.map(row => {
+        const av = Number.isFinite(Number(row[1])) ? Math.max(0, Math.min(row[3], Number(row[1]))) : 0;
+        const bv = Number.isFinite(Number(row[2])) ? Math.max(0, Math.min(row[3], Number(row[2]))) : 0;
+        return '<div class="analysis-compare-bar-row"><strong>' + phase4Escape(row[0]) + '</strong><div class="analysis-compare-bar-track" aria-label="' + phase4Escape(row[0]) + ' A ' + phase4Escape(phase5FormatNumber(row[1])) + ' B ' + phase4Escape(phase5FormatNumber(row[2])) + '"><span style="width:' + (av / row[3] * 100) + '%"></span><span style="width:' + (bv / row[3] * 100) + '%"></span></div><span>A / B</span></div>';
+      }).join('') + '</div>';
+    }
+
+    function phase5RenderComparison(context, dimensions) {
+      const state = analysisComparisonState;
+      if (state.dimension !== 'period' && (!state.a || !state.b)) {
+        const optionMap = { pl: dimensions.pls, pc: dimensions.pcs, session: dimensions.sessions, playGroup: dimensions.playGroups, role: dimensions.roleOptions, system: dimensions.systems };
+        const values = (optionMap[state.dimension] || []).map(option => String(option.id == null ? option.value : option.id));
+        if (!state.a) state.a = values[0] || '';
+        if (!state.b) state.b = values[1] || values[0] || '';
+      }
+      const axisOptions = [['role', 'role'], ['pl', 'PL'], ['pc', 'PC'], ['session', 'session'], ['playGroup', 'プレイグループ'], ['system', 'system'], ['period', '期間']].map(option => '<option value="' + option[0] + '"' + (state.dimension === option[0] ? ' selected' : '') + '>' + option[1] + '</option>').join('');
+      const selectA = state.dimension === 'period' ? '<input id="analysis-compare-a-from" type="date" value="' + (state.periodAFrom || '') + '"><input id="analysis-compare-a-to" type="date" value="' + (state.periodATo || '') + '">' : '<select id="analysis-compare-a">' + phase5ComparisonOptions(dimensions, state.dimension, state.a) + '</select>';
+      const selectB = state.dimension === 'period' ? '<input id="analysis-compare-b-from" type="date" value="' + (state.periodBFrom || '') + '"><input id="analysis-compare-b-to" type="date" value="' + (state.periodBTo || '') + '">' : '<select id="analysis-compare-b">' + phase5ComparisonOptions(dimensions, state.dimension, state.b) + '</select>';
+      const controls = '<div class="analysis-comparison-grid"><label>比較軸<select id="analysis-compare-dimension">' + axisOptions + '</select></label><label>A' + selectA + '</label><label>B' + selectB + '</label></div>';
+      if (!state.enabled) return '<div class="card"><div class="analysis-section-title"><h2>比較分析</h2><label style="color:#cbd5e1;font-size:.85rem;"><input id="analysis-compare-enabled" type="checkbox"> 比較する</label></div><p style="color:#94a3b8;margin-bottom:0;">共通filterを維持したまま、2つの条件を数値で比較できます。</p></div>';
+      const comparisonFilters = phase5BuildComparisonFilters();
+      const comparison = TRPGAnalysis.compareAnalysisFilters(context, analysisFilterState, comparisonFilters.a, comparisonFilters.b, { minimumSampleSize: 5 });
+      const a = comparison.statsA, b = comparison.statsB, d = comparison.difference;
+      const warning = comparison.warnings.length ? '<p class="badge warning" style="margin-top:12px;">' + phase4Escape(comparison.warnings.join(' / ')) + '</p>' : '';
+      const metricRows = phase5ComparisonMetric('判定数', a.judgementCount, b.judgementCount, d.judgementCount, value => value == null ? '-' : String(Math.round(value)), !a.rollCount, !b.rollCount) + phase5ComparisonMetric('成功率', a.successRate, b.successRate, d.successRate, phase5FormatRate, !a.classifiedJudgementCount, !b.classifiedJudgementCount) + phase5ComparisonMetric('Critical率', a.criticalRate, b.criticalRate, d.criticalRate, phase5FormatRate, !a.classifiedJudgementCount, !b.classifiedJudgementCount) + phase5ComparisonMetric('Fumble率', a.fumbleRate, b.fumbleRate, d.fumbleRate, phase5FormatRate, !a.classifiedJudgementCount, !b.classifiedJudgementCount) + phase5ComparisonMetric('平均出目', a.averageRoll, b.averageRoll, d.averageRoll, value => value == null ? '-' : phase5FormatNumber(value), !a.averageRollSampleCount, !b.averageRollSampleCount);
+      return '<div class="card"><div class="analysis-section-title"><h2>比較分析</h2><label style="color:#cbd5e1;font-size:.85rem;"><input id="analysis-compare-enabled" type="checkbox" checked> 比較する</label></div>' + controls + warning + '<div style="margin-top:14px;">' + metricRows + phase5ComparisonBars(a, b) + '</div></div>';
+    }
+
     function phase5RenderBasicStats(context) {
       const target = document.getElementById('analysis-content');
       if (!target) return;
-      if (!context.rawRolls.length && !context.sessions.length) {
-        target.innerHTML = '<div class="card dashboard-empty">まだ分析できるログがありません。</div>';
-        return;
-      }
+      if (!context.rawRolls.length && !context.sessions.length) { target.innerHTML = '<div class="card dashboard-empty">まだ分析できるログがありません。</div>'; return; }
       const filtered = TRPGAnalysis.applyAnalysisFilter(context, analysisFilterState);
       if (!filtered.sessions.length && !filtered.resolvedRolls.length) {
         const countLabel = document.getElementById('analysis-filter-count');
@@ -1415,26 +1550,27 @@
         return;
       }
       const stats = TRPGAnalysis.calculateBasicStats(filtered);
-      const pcStats = new Map();
-      filtered.resolvedRolls.filter(roll => roll.isJudgement && roll.pcId).forEach(roll => { if (!pcStats.has(roll.pcId)) pcStats.set(roll.pcId, []); pcStats.get(roll.pcId).push(roll); });
-      const pcRows = [...pcStats.entries()].sort((a, b) => b[1].length - a[1].length).map(([pcId, rolls]) => {
-        const summary = TRPGAnalysis.calculateBasicStats({ rolls, resolvedRolls: rolls, sessions: filtered.sessions });
-        return '<tr><td>' + phase4Escape(context.pcMap.get(pcId)?.name || pcId) + '</td><td>' + summary.judgementCount + '</td><td>' + (summary.successRate * 100).toFixed(1) + '%</td><td>' + summary.critical + '</td><td>' + summary.fumble + '</td></tr>';
-      }).join('');
-      const average = stats.averageRoll == null ? '-' : stats.averageRoll.toFixed(1) + ' (' + stats.averageRollSampleCount + '件)';
+      const dimensions = TRPGAnalysis.buildAnalysisDimensions(filtered);
       const countLabel = document.getElementById('analysis-filter-count');
       if (countLabel) countLabel.textContent = '対象: ' + stats.sessionCount + '卓 / ' + stats.judgementCount + '判定';
-      target.innerHTML = '<div class="card"><div class="analysis-stats-grid">' +
-        '<div class="analysis-stat-card"><small>対象卓</small><strong>' + stats.sessionCount + '</strong></div>' +
-        '<div class="analysis-stat-card"><small>対象roll</small><strong>' + stats.rollCount + '</strong></div>' +
-        '<div class="analysis-stat-card"><small>判定（分類済）</small><strong>' + stats.classifiedJudgementCount + '/' + stats.judgementCount + '</strong></div>' +
-        '<div class="analysis-stat-card"><small>成功率</small><strong style="color:var(--success);">' + (stats.successRate * 100).toFixed(1) + '%</strong><small>' + stats.success + ' / ' + stats.successRateDenominator + '</small></div>' +
-        '<div class="analysis-stat-card"><small>成功</small><strong>' + stats.success + '</strong></div><div class="analysis-stat-card"><small>失敗</small><strong>' + stats.failure + '</strong></div>' +
-        '<div class="analysis-stat-card"><small>クリティカル</small><strong style="color:#fde047;">' + stats.critical + '</strong></div><div class="analysis-stat-card"><small>ファンブル</small><strong style="color:#d8b4fe;">' + stats.fumble + '</strong></div>' +
-        '<div class="analysis-stat-card"><small>平均出目</small><strong>' + average + '</strong></div></div>' +
-        '<p style="color:#94a3b8;font-size:.85rem;margin-bottom:0;">成功率の分母は分類可能な判定' + stats.successRateDenominator + '件です。unknown判定' + stats.unknownJudgementCount + '件、平均出目サンプル' + stats.averageRollSampleCount + '件。</p></div>' +
-        '<div class="card"><h3>PC別（canonical ID）</h3>' + (pcRows ? '<table><thead><tr><th>PC</th><th>判定</th><th>成功率</th><th>クリ</th><th>ファンブル</th></tr></thead><tbody>' + pcRows + '</tbody></table>' : '<div class="dashboard-empty">PC未整理の判定を含むため、PC別行はありません。</div>') + '</div>' +
-        '<div class="card" style="color:#94a3b8;">詳細分析（技能・比較・ダイス事件簿など）は次のPhaseで追加します。</div>';
+      target.innerHTML = phase5RenderSummary(stats) + phase5RenderDistribution(filtered) + phase5RenderSkillAnalysis(filtered) + '<div class="card"><div class="analysis-section-title"><h2>内訳</h2><small>全体statsは複数group所属でも二重計上しません</small></div>' + phase5RenderBreakdowns(filtered) + '</div>' + phase5RenderComparison(context, dimensions);
+      if (!target.dataset.analysisBound) {
+        target.dataset.analysisBound = 'true';
+        target.addEventListener('change', event => {
+          const id = event.target.id;
+          if (id === 'analysis-skill-sort') analysisSkillSortState.sortBy = event.target.value;
+          if (id === 'analysis-skill-min') analysisSkillSortState.minimumSampleSize = Math.max(1, Math.floor(Number(event.target.value) || 1));
+          if (id === 'analysis-compare-enabled') analysisComparisonState.enabled = Boolean(event.target.checked);
+          if (id === 'analysis-compare-dimension') { analysisComparisonState.dimension = event.target.value; analysisComparisonState.a = ''; analysisComparisonState.b = ''; }
+          if (id === 'analysis-compare-a') analysisComparisonState.a = event.target.value;
+          if (id === 'analysis-compare-b') analysisComparisonState.b = event.target.value;
+          if (id === 'analysis-compare-a-from') analysisComparisonState.periodAFrom = event.target.value || null;
+          if (id === 'analysis-compare-a-to') analysisComparisonState.periodATo = event.target.value || null;
+          if (id === 'analysis-compare-b-from') analysisComparisonState.periodBFrom = event.target.value || null;
+          if (id === 'analysis-compare-b-to') analysisComparisonState.periodBTo = event.target.value || null;
+          if (id.startsWith('analysis-')) phase5RenderFilteredAnalysis();
+        });
+      }
     }
           
     function phase5RenderFilteredAnalysis() {

@@ -333,3 +333,262 @@ test('filter predicate registry accepts a future roll dimension', () => {
   assert.deepEqual(analysis.applyAnalysisFilter(context, { diceTags: ['featured'] }).resolvedRolls.map(item => item.id), ['tagged']);
   assert.equal(typeof analysis.listFilterPredicates().diceTags, 'function');
 });
+
+const moduleSessions = [
+  { id: 'ms-a', title: '同名卓', dateStart: '2026-03-01' },
+  { id: 'ms-b', title: '同名卓', dateStart: '2026-04-01' }
+];
+function moduleRoll(id, values = {}) {
+  return {
+    id,
+    sourceKey: 'module:' + id,
+    sessionId: 'ms-a',
+    rawSpeaker: '',
+    isJudgement: true,
+    skillRaw: '聞き耳',
+    system: 'CoC6',
+    targetValue: 60,
+    rolledValue: 50,
+    result: 'success',
+    role: 'PC',
+    sequenceInSession: Number(id.replace(/\D/g, '')) || 1,
+    ...values
+  };
+}
+function moduleContext(extra = {}) {
+  return analysis.createAnalysisContext({
+    sessions: moduleSessions,
+    rolls: [
+      moduleRoll('mr1', { rolledValue: 1, result: 'critical', skillRaw: ' 聞き耳 ' }),
+      moduleRoll('mr2', { rolledValue: 58, result: 'success', skillRaw: '聞き耳' }),
+      moduleRoll('mr3', { rolledValue: 61, result: 'failure', skillRaw: '聞き耳', targetValue: 60 }),
+      moduleRoll('mr4', { sessionId: 'ms-b', rolledValue: 100, result: 'fumble', skillRaw: '目星', role: 'KPC', system: 'CoC7' }),
+      moduleRoll('mr5', { sessionId: 'ms-b', rolledValue: 'not-a-number', result: 'unknown', skillRaw: '目星', targetValue: null }),
+      moduleRoll('mr6', { sessionId: 'ms-b', isJudgement: false, skillRaw: '1D6', result: 'unknown', rolledValue: 4, targetValue: null })
+    ],
+    pcs: [{ id: 'mpc-a', name: 'PC A', plId: 'mpl-a' }],
+    pls: [{ id: 'mpl-a', name: 'PL A' }],
+    mappings: [],
+    sessionParticipants: [],
+    playGroups: [{ id: 'mg-a', name: 'Group A' }, { id: 'mg-b', name: 'Group B' }],
+    sessionPlayGroups: [{ id: 'mrel-a', sessionId: 'ms-a', playGroupId: 'mg-a' }, { id: 'mrel-b', sessionId: 'ms-a', playGroupId: 'mg-b' }],
+    statusChanges: [],
+    overrides: [],
+    ...extra
+  });
+}
+
+test('basic stats expose critical/fumble rates and exact 1/100', () => {
+  const stats = analysis.calculateBasicStats(moduleContext());
+  assert.equal(stats.critical, 1);
+  assert.equal(stats.fumble, 1);
+  assert.equal(stats.criticalRate, 1 / 4);
+  assert.equal(stats.fumbleRate, 1 / 4);
+  assert.equal(stats.exact1, 1);
+  assert.equal(stats.exact100, 1);
+  assert.equal(stats.criticalRate, stats.evidence.criticalRate.value);
+});
+
+test('roll distribution uses ten d100 buckets', () => {
+  const distribution = analysis.calculateRollDistribution(moduleContext());
+  assert.equal(distribution.length, 10);
+  assert.deepEqual(distribution[0], { min: 1, max: 10, count: 1 });
+  assert.deepEqual(distribution[5], { min: 51, max: 60, count: 1 });
+  assert.deepEqual(distribution[9], { min: 91, max: 100, count: 1 });
+  assert.equal(distribution.sampleCount, 4);
+  assert.equal(distribution.reduce((sum, bucket) => sum + bucket.count, 0), distribution.sampleCount);
+});
+
+test('roll distribution supports a custom bucket size', () => {
+  const distribution = analysis.calculateRollDistribution(moduleContext(), { min: 1, max: 100, bucketSize: 20 });
+  assert.equal(distribution.length, 5);
+  assert.deepEqual(distribution[0], { min: 1, max: 20, count: 1 });
+  assert.deepEqual(distribution[4], { min: 81, max: 100, count: 1 });
+});
+
+test('roll distribution excludes nonnumeric and nonjudgement values', () => {
+  const distribution = analysis.calculateRollDistribution(moduleContext({ rolls: [moduleRoll('numeric', { rolledValue: 20 }), moduleRoll('text', { rolledValue: 'x' }), moduleRoll('dice', { isJudgement: false, rolledValue: 20 })] }));
+  assert.equal(distribution.sampleCount, 1);
+  assert.equal(distribution[1].count, 1);
+});
+
+test('margin computes target minus roll without changing parser result', () => {
+  const success = moduleRoll('margin-success', { targetValue: 60, rolledValue: 58, result: 'failure' });
+  const failure = moduleRoll('margin-failure', { targetValue: 60, rolledValue: 61, result: 'success' });
+  assert.equal(analysis.calculateMargin(success), 2);
+  assert.equal(analysis.calculateRollMargin(failure), -1);
+  assert.equal(success.result, 'failure');
+  assert.equal(failure.result, 'success');
+});
+
+test('margin is null when target or roll is unavailable', () => {
+  assert.equal(analysis.calculateMargin(moduleRoll('no-target', { targetValue: null })), null);
+  assert.equal(analysis.calculateMargin(moduleRoll('no-roll', { rolledValue: null })), null);
+  assert.equal(analysis.calculateMargin(moduleRoll('not-judgement', { isJudgement: false })), null);
+});
+
+test('close success and failure helpers use the configured threshold', () => {
+  assert.equal(analysis.isCloseSuccess(moduleRoll('close-success', { targetValue: 60, rolledValue: 56 }), 5), true);
+  assert.equal(analysis.isCloseSuccess(moduleRoll('far-success', { targetValue: 60, rolledValue: 50 }), 5), false);
+  assert.equal(analysis.isCloseFailure(moduleRoll('close-failure', { targetValue: 60, rolledValue: 64 }), 5), true);
+  assert.equal(analysis.isCloseFailure(moduleRoll('far-failure', { targetValue: 60, rolledValue: 70 }), 5), false);
+});
+
+test('findExactRolls returns only numeric judgement matches', () => {
+  const exact = analysis.findExactRolls(moduleContext(), 1);
+  assert.deepEqual(exact.map(item => item.id), ['mr1']);
+  assert.equal(analysis.findExactRolls(moduleContext(), 'not-a-number').length, 0);
+});
+
+test('skill stats group normalized display variants without semantic guessing', () => {
+  const rows = analysis.calculateSkillStats(moduleContext());
+  const listen = rows.find(row => row.skillKey === '聞き耳');
+  assert.ok(listen);
+  assert.equal(listen.displayName, '聞き耳');
+  assert.equal(listen.usageCount, 3);
+  assert.equal(listen.classifiedCount, 3);
+});
+
+test('skill stats expose success, critical, fumble, averages, and rates', () => {
+  const rows = analysis.calculateSkillStats(moduleContext());
+  const listen = rows.find(row => row.skillKey === '聞き耳');
+  const spot = rows.find(row => row.skillKey === '目星');
+  assert.equal(listen.successCount, 2);
+  assert.equal(listen.failureCount, 1);
+  assert.equal(listen.successRate, 2 / 3);
+  assert.equal(listen.averageRoll, (1 + 58 + 61) / 3);
+  assert.equal(listen.averageTarget, 60);
+  assert.equal(spot.criticalCount, 0);
+  assert.equal(spot.fumbleCount, 1);
+});
+
+test('skill target and roll samples exclude null values', () => {
+  const rows = analysis.calculateSkillStats(moduleContext({ rolls: [moduleRoll('a', { skillRaw: 'A', rolledValue: 10, targetValue: 50 }), moduleRoll('b', { skillRaw: 'A', rolledValue: null, targetValue: null, result: 'unknown' })] }));
+  assert.equal(rows[0].averageRollSampleCount, 1);
+  assert.equal(rows[0].averageTargetSampleCount, 1);
+});
+
+test('skill stats omit rolls without skill names', () => {
+  const rows = analysis.calculateSkillStats(moduleContext({ rolls: [moduleRoll('named', { skillRaw: 'A' }), moduleRoll('unnamed', { skillRaw: '' })] }));
+  assert.deepEqual(rows.map(row => row.skillKey), ['a']);
+});
+
+test('skill stats support sorting and minimum classified sample size', () => {
+  const rows = analysis.calculateSkillStats(moduleContext(), { sortBy: 'successRate' });
+  assert.equal(rows[0].displayName, '聞き耳');
+  const ranked = analysis.calculateSkillStats(moduleContext(), { minimumSampleSize: 3 });
+  assert.deepEqual(ranked.map(row => row.displayName), ['聞き耳']);
+});
+
+test('skill stats retain recent records with resolved metadata fields', () => {
+  const context = moduleContext({ sessions: [{ id: 'ms-a', title: 'Recent', dateStart: '2026-03-01' }], rolls: [moduleRoll('r1', { skillRaw: 'A', sequenceInSession: 2 }), moduleRoll('r2', { skillRaw: 'A', sequenceInSession: 1 })] });
+  const row = analysis.calculateSkillStats(context, { recentLimit: 1 })[0];
+  assert.equal(row.recentRecords.length, 1);
+  assert.equal(row.recentRecords[0].sessionTitle, 'Recent');
+  assert.equal(row.recentRecords[0].rolledValue, 50);
+});
+
+test('PL breakdown excludes unresolved attribution and reports overall separately', () => {
+  const context = moduleContext({ mappings: [{ id: 'map', rawSpeakerNormalized: '', pcId: 'mpc-a', plId: 'mpl-a', scope: 'global' }], rolls: [moduleRoll('pl', { rawSpeaker: '', skillRaw: 'A' }), moduleRoll('unresolved', { rawSpeaker: 'unknown', skillRaw: 'B' })] });
+  const breakdown = analysis.calculateBreakdown(context, 'pl');
+  assert.equal(breakdown.rows.length, 1);
+  assert.equal(breakdown.rows[0].id, 'mpl-a');
+  assert.equal(breakdown.overall.rollCount, 2);
+});
+
+test('PC breakdown uses canonical PC id after identity resolution', () => {
+  const context = moduleContext({ mappings: [{ id: 'map', rawSpeakerNormalized: 'Alice', pcId: 'mpc-a', plId: 'mpl-a', scope: 'global' }], rolls: [moduleRoll('pc', { rawSpeaker: 'Alice' })] });
+  const breakdown = analysis.calculateBreakdown(context, 'pc');
+  assert.equal(breakdown.rows[0].id, 'mpc-a');
+  assert.equal(breakdown.rows[0].label, 'PC A');
+});
+
+test('session breakdown keeps same-title sessions separate', () => {
+  const context = moduleContext({ rolls: [moduleRoll('a', { sessionId: 'ms-a' }), moduleRoll('b', { sessionId: 'ms-b' })] });
+  const breakdown = analysis.calculateBreakdown(context, 'session');
+  assert.deepEqual(breakdown.rows.map(row => row.id).sort(), ['ms-a', 'ms-b']);
+});
+
+test('playGroup breakdown duplicates multi-group rows but not overall totals', () => {
+  const context = moduleContext({ rolls: [moduleRoll('grouped', { sessionId: 'ms-a' })] });
+  const breakdown = analysis.calculateBreakdown(context, 'playGroup');
+  assert.deepEqual(breakdown.rows.map(row => row.id).sort(), ['mg-a', 'mg-b']);
+  assert.equal(breakdown.rows.reduce((sum, row) => sum + row.rollCount, 0), 2);
+  assert.equal(breakdown.overall.rollCount, 1);
+});
+
+test('ungrouped playGroup breakdown has a special row', () => {
+  const context = moduleContext({ rolls: [moduleRoll('ungrouped', { sessionId: 'ms-b' })] });
+  const breakdown = analysis.calculateBreakdown(context, 'group');
+  assert.equal(breakdown.rows[0].id, analysis.UNGROUPED);
+});
+
+test('role and system breakdown keep KPC and unknown independent', () => {
+  const context = moduleContext({ rolls: [moduleRoll('pc', { role: 'PC', system: 'CoC6' }), moduleRoll('kpc', { role: 'KPC', system: 'unknown' })] });
+  assert.deepEqual(analysis.calculateBreakdown(context, 'role').rows.map(row => row.id).sort(), ['KPC', 'PC']);
+  assert.deepEqual(analysis.calculateBreakdown(context, 'system').rows.map(row => row.id).sort(), ['CoC6', 'unknown']);
+});
+
+test('breakdown does not mutate source rolls', () => {
+  const context = moduleContext();
+  const before = JSON.stringify(context.rawRolls);
+  analysis.calculateBreakdown(context, 'session');
+  assert.equal(JSON.stringify(context.rawRolls), before);
+});
+
+test('comparison preserves base filter and adds A/B conditions', () => {
+  const context = moduleContext();
+  const comparison = analysis.compareAnalysisFilters(context, { dateRange: { from: '2026-03-01', to: '2026-03-31' } }, { roles: ['PC'] }, { roles: ['KPC'] });
+  assert.deepEqual(comparison.filterA.dateRange, { from: '2026-03-01', to: '2026-03-31' });
+  assert.deepEqual(comparison.filterA.roles, ['PC']);
+  assert.deepEqual(comparison.filterB.roles, ['KPC']);
+  assert.equal(comparison.statsA.judgementCount, 3);
+  assert.equal(comparison.statsB.judgementCount, 0);
+});
+
+test('comparison supports group A versus group B', () => {
+  const context = moduleContext({ rolls: [moduleRoll('a', { sessionId: 'ms-a' }), moduleRoll('b', { sessionId: 'ms-b' })], sessionPlayGroups: [{ sessionId: 'ms-a', playGroupId: 'mg-a' }, { sessionId: 'ms-b', playGroupId: 'mg-b' }] });
+  const comparison = analysis.compareAnalysisFilters(context, {}, { playGroupIds: ['mg-a'] }, { playGroupIds: ['mg-b'] });
+  assert.equal(comparison.statsA.rollCount, 1);
+  assert.equal(comparison.statsB.rollCount, 1);
+});
+
+test('comparison exposes metric differences and avoids NaN for empty sides', () => {
+  const context = moduleContext({ rolls: [moduleRoll('a', { role: 'PC' })] });
+  const comparison = analysis.compareAnalysisFilters(context, {}, { roles: ['PC'] }, { roles: ['GM'] });
+  assert.equal(comparison.difference.judgementCount, 1);
+  assert.equal(comparison.difference.successRate, null);
+  assert.equal(comparison.statsB.averageRoll, null);
+  assert.equal(comparison.sampleWarning, true);
+  assert.ok(comparison.warnings.some(message => message.includes('比較B')));
+});
+
+test('comparison supports PL, PC, session, system, and period filter dimensions', () => {
+  const context = moduleContext();
+  for (const pair of [
+    [{ plIds: ['mpl-a'] }, { plIds: ['missing'] }],
+    [{ pcIds: ['mpc-a'] }, { pcIds: ['missing'] }],
+    [{ sessionIds: ['ms-a'] }, { sessionIds: ['ms-b'] }],
+    [{ systems: ['CoC6'] }, { systems: ['CoC7'] }],
+    [{ dateRange: { from: '2026-03-01', to: '2026-03-31' } }, { dateRange: { from: '2026-04-01', to: '2026-04-30' } }]
+  ]) {
+    const comparison = analysis.compareAnalysisFilters(context, {}, pair[0], pair[1]);
+    assert.ok(comparison.statsA && comparison.statsB);
+  }
+});
+
+test('common filtered context feeds distribution, skills, and breakdown consistently', () => {
+  const context = moduleContext();
+  const filtered = analysis.applyAnalysisFilter(context, { sessionIds: ['ms-a'] });
+  assert.equal(analysis.calculateBasicStats(filtered).rollCount, 3);
+  assert.equal(analysis.calculateRollDistribution(filtered).sampleCount, 3);
+  assert.equal(analysis.calculateSkillStats(filtered).reduce((sum, row) => sum + row.usageCount, 0), 3);
+  assert.equal(analysis.calculateBreakdown(filtered, 'session').rows[0].rollCount, 3);
+});
+
+test('new analysis modules are registered for distribution, skills, and breakdown', () => {
+  const modules = analysis.listAnalysisModules();
+  assert.ok(modules.some(item => item.id === 'distribution'));
+  assert.ok(modules.some(item => item.id === 'skills'));
+  assert.ok(modules.some(item => item.id === 'breakdown'));
+});

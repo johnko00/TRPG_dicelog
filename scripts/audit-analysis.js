@@ -34,6 +34,15 @@ function collectFiles(inputs) {
   return files.sort();
 }
 
+function containsNonFinite(value, seen) {
+  if (typeof value === 'number') return !Number.isFinite(value);
+  if (!value || typeof value !== 'object') return false;
+  const visited = seen || new Set();
+  if (visited.has(value)) return false;
+  visited.add(value);
+  return Object.values(value).some(item => containsNonFinite(item, visited));
+}
+
 function auditFile(file, index) {
   const html = fs.readFileSync(file, 'utf8');
   const items = parser.parseCcfoliaHtml(html, { document: documentFromHtml(html) });
@@ -47,6 +56,23 @@ function auditFile(file, index) {
   const context = analysis.createAnalysisContext({ sessions: [{ id: sessionId, dateStart: null }], rolls, pcs: [], pls: [], mappings: [], sessionParticipants: [], playGroups: [], sessionPlayGroups: [], overrides: [], statusChanges: [] });
   const filtered = analysis.applyAnalysisFilter(context, {});
   const stats = analysis.calculateBasicStats(filtered);
+  const judgementRolls = rolls.filter(roll => roll.isJudgement);
+  const numericJudgements = judgementRolls.filter(roll => Number.isFinite(Number(roll.rolledValue)));
+  const namedJudgements = judgementRolls.filter(roll => String(roll.skillRaw || roll.skillCanonical || '').trim());
+  const numericTargets = judgementRolls.filter(roll => Number.isFinite(Number(roll.targetValue)));
+  const marginCalculable = judgementRolls.filter(roll => analysis.calculateMargin(roll) !== null);
+  const skillRows = analysis.calculateSkillStats(filtered);
+  const roleJudgementCounts = {};
+  judgementRolls.forEach(roll => {
+    const role = String(roll.role || 'unresolved').toUpperCase();
+    roleJudgementCounts[role] = (roleJudgementCounts[role] || 0) + 1;
+  });
+  const sanity = {
+    nanOrInfinity: [...rolls, stats].some(value => containsNonFinite(value)) ? 1 : 0,
+    negativeCounts: Object.values(stats).some(value => typeof value === 'number' && value < 0) ? 1 : 0,
+    classifiedExceedsJudgement: stats.classifiedJudgementCount > stats.judgementCount ? 1 : 0,
+    successFailureMismatch: stats.success + stats.failure !== stats.classifiedJudgementCount ? 1 : 0
+  };
   const systemCounts = {};
   rolls.forEach(roll => { const system = roll.system || 'unknown'; systemCounts[system] = (systemCounts[system] || 0) + 1; });
   return {
@@ -57,6 +83,18 @@ function auditFile(file, index) {
     judgementCount: stats.judgementCount,
     classifiedJudgementCount: stats.classifiedJudgementCount,
     unknownJudgementCount: stats.unknownJudgementCount,
+    numericJudgementCount: numericJudgements.length,
+    averageRollSampleCount: stats.averageRollSampleCount,
+    exact1Count: stats.exact1,
+    exact100Count: stats.exact100,
+    skillNamedJudgementCount: namedJudgements.length,
+    skillKeys: skillRows.map(row => row.skillKey),
+    numericTargetCount: numericTargets.length,
+    marginCalculableCount: marginCalculable.length,
+    plResolvedJudgementCount: judgementRolls.filter(roll => roll.plId).length,
+    pcResolvedJudgementCount: judgementRolls.filter(roll => roll.pcId).length,
+    roleJudgementCounts,
+    sanity,
     systemCounts,
     roleResolvedCount: rolls.filter(roll => roll.role).length,
     roleUnresolvedCount: rolls.filter(roll => !roll.role).length,
@@ -75,12 +113,16 @@ function main() {
   const files = collectFiles(inputs);
   if (!files.length) { console.error('No HTML files found in the supplied paths.'); process.exitCode = 2; return; }
   const summaries = files.map(auditFile);
-  const total = { logCount: files.length, messageCount: 0, rollCount: 0, analysisTargetRollCount: 0, analysisExcludedCount: 0, judgementCount: 0, classifiedJudgementCount: 0, unknownJudgementCount: 0, systemCounts: {}, roleResolvedCount: 0, roleUnresolvedCount: 0, pcResolvedCount: 0, pcUnresolvedCount: 0, plResolvedCount: 0, plUnresolvedCount: 0, groupConfiguredSessionCount: 0, groupUngroupedSessionCount: 0 };
+  const skillKeys = new Set();
+  const total = { logCount: files.length, messageCount: 0, rollCount: 0, analysisTargetRollCount: 0, analysisExcludedCount: 0, judgementCount: 0, classifiedJudgementCount: 0, unknownJudgementCount: 0, numericJudgementCount: 0, averageRollSampleCount: 0, exact1Count: 0, exact100Count: 0, skillNamedJudgementCount: 0, uniqueSkillCount: 0, numericTargetCount: 0, marginCalculableCount: 0, plResolvedJudgementCount: 0, pcResolvedJudgementCount: 0, systemCounts: {}, roleJudgementCounts: {}, roleResolvedCount: 0, roleUnresolvedCount: 0, pcResolvedCount: 0, pcUnresolvedCount: 0, plResolvedCount: 0, plUnresolvedCount: 0, groupConfiguredSessionCount: 0, groupUngroupedSessionCount: 0, sanity: { nanOrInfinity: 0, negativeCounts: 0, classifiedExceedsJudgement: 0, successFailureMismatch: 0 } };
   summaries.forEach(summary => Object.entries(summary).forEach(([key, value]) => {
     if (key === 'systemCounts') Object.entries(value).forEach(([system, count]) => { total.systemCounts[system] = (total.systemCounts[system] || 0) + count; });
-    else if (key !== 'messageCount' && key !== 'rollCount' && key !== 'analysisTargetRollCount' && key !== 'analysisExcludedCount' && key !== 'judgementCount' && key !== 'classifiedJudgementCount' && key !== 'unknownJudgementCount' && key !== 'roleResolvedCount' && key !== 'roleUnresolvedCount' && key !== 'pcResolvedCount' && key !== 'pcUnresolvedCount' && key !== 'plResolvedCount' && key !== 'plUnresolvedCount' && key !== 'groupConfiguredSessionCount' && key !== 'groupUngroupedSessionCount') return;
-    else total[key] += value;
+    else if (key === 'roleJudgementCounts') Object.entries(value).forEach(([role, count]) => { total.roleJudgementCounts[role] = (total.roleJudgementCounts[role] || 0) + count; });
+    else if (key === 'sanity') Object.entries(value).forEach(([name, count]) => { total.sanity[name] += count; });
+    else if (key === 'skillKeys') value.forEach(skillKey => skillKeys.add(skillKey));
+    else if (typeof value === 'number' && key !== 'logCount') total[key] += value;
   }));
+  total.uniqueSkillCount = skillKeys.size;
   console.log(JSON.stringify({ ...total, metadataNote: 'This audit uses anonymous parser output only. Real names, scenario text, and file names are never printed.', localOnly: true }, null, 2));
 }
 
