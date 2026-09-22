@@ -205,9 +205,29 @@
     return { saving, expense, net: saving - expense, total: saving + expense };
   }
 
-  function buildLedgerSnapshot(item) {
-    return { ...item, confirmedAt: new Date().toISOString() };
+  function buildLedgerSnapshot(item, confirmedAt) {
+    return { ...item, confirmedAt: confirmedAt || new Date().toISOString() };
   }
 
-  return { RESULT_NAMES, normalizeRule, createLineageCandidateKey: buildCandidateKey, buildCandidateKey, amountForRule, matchesRollCondition, generateRollCandidates, generateSessionCandidates, dedupeCandidates, confirmedCandidateKeys, pendingCandidates, calculateReviewTotals, buildLedgerSnapshot };
+  function buildConfirmationRecords(options) {
+    const config = options || {};
+    const sessionId = config.sessionId || null;
+    const now = config.confirmedAt || new Date().toISOString();
+    const candidates = config.candidates || [];
+    const selectedKeys = config.selectedKeys instanceof Set ? config.selectedKeys : new Set(config.selectedKeys || []);
+    const selected = candidates.filter(candidate => selectedKeys.has(candidate.candidateKey));
+    const items = [...selected, ...(config.manualItems || [])];
+    const savingItems = items.filter(item => item.type !== 'expense').map(item => buildLedgerSnapshot(item, now));
+    const expenseItems = items.filter(item => item.type === 'expense').map(item => buildLedgerSnapshot(item, now));
+    const idFor = (type, details) => `ledger:${identity.stableHash([sessionId, type, now, details.map(item => item.candidateKey || item.id || item.label || '').join('\u241f')].join('\u241e'))}`;
+    const ledgerEntries = [];
+    if (savingItems.length) ledgerEntries.push({ id: idFor('saving', savingItems), sessionId, date: now.split('T')[0], type: 'saving', amount: savingItems.reduce((sum, item) => sum + Number(item.amount || 0), 0), label: 'TRPG貯金', details: savingItems, createdAt: now });
+    if (expenseItems.length) ledgerEntries.push({ id: idFor('expense', expenseItems), sessionId, date: now.split('T')[0], type: 'expense', amount: expenseItems.reduce((sum, item) => sum + Number(item.amount || 0), 0), label: 'TRPG関連支出', details: expenseItems, createdAt: now });
+    const acceptedLedgerId = new Map();
+    ledgerEntries.forEach(entry => entry.details.forEach(detail => { if (detail.candidateKey) acceptedLedgerId.set(detail.candidateKey, entry.id); }));
+    const decisions = candidates.map(candidate => ({ id: `decision:${identity.stableHash([candidate.candidateKey, now].join('\u241f'))}`, candidateKey: candidate.candidateKey, sessionId, decision: selectedKeys.has(candidate.candidateKey) ? 'accepted' : 'dismissed', ledgerEntryId: acceptedLedgerId.get(candidate.candidateKey) || null, decidedAt: now }));
+    return { items, ledgerEntries, decisions, totals: calculateReviewTotals(items) };
+  }
+
+  return { RESULT_NAMES, normalizeRule, createLineageCandidateKey: buildCandidateKey, buildCandidateKey, amountForRule, matchesRollCondition, generateRollCandidates, generateSessionCandidates, dedupeCandidates, confirmedCandidateKeys, pendingCandidates, calculateReviewTotals, buildLedgerSnapshot, buildConfirmationRecords };
 });

@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const savings = require('../src/savings.js');
 
 const pc = { id: 'pc-1', name: 'Character', plId: 'pl-me' };
@@ -89,4 +90,40 @@ test('candidate provenance and ledger snapshot preserve values at confirmation t
   const snapshot = savings.buildLedgerSnapshot(candidate);
   assert.equal(snapshot.amount, 500);
   assert.ok(snapshot.confirmedAt);
+});
+
+test('Phase 3 UI has no legacy rollId candidate flow', () => {
+  const html = fs.readFileSync(require.resolve('../index.html'), 'utf8');
+  for (const legacy of ['savedCombos', '_sessionCandidates', 'confirmSessionSavings', 'savings-candidates-container', "r.id + '_' + rule.id"]) assert.equal(html.includes(legacy), false, legacy);
+});
+
+test('accepted candidates return after ledger cancellation while dismissed remain hidden', () => {
+  const candidates = savings.generateRollCandidates(context({ rolls: [base(), base({ sourceKey: 'source:roll-2', id: 'roll-2', result: 'fumble', normalizedResult: 'fumble' })] }));
+  const accepted = candidates[0];
+  const dismissed = candidates[1];
+  const decisions = [{ candidateKey: accepted.candidateKey, decision: 'accepted', ledgerEntryId: 'ledger-1' }, { candidateKey: dismissed.candidateKey, decision: 'dismissed', ledgerEntryId: null }];
+  const ledger = [{ id: 'ledger-1', details: [{ candidateKey: accepted.candidateKey }] }];
+  assert.equal(savings.pendingCandidates(candidates, ledger, decisions).length, 0);
+  const afterCancel = savings.pendingCandidates(candidates, [], decisions.filter(decision => decision.candidateKey !== accepted.candidateKey));
+  assert.deepEqual(afterCancel.map(candidate => candidate.candidateKey), [accepted.candidateKey]);
+});
+
+test('confirmation creates separate saving and expense ledgers with matching decisions', () => {
+  const saving = savings.generateRollCandidates(context())[0];
+  const expense = { ...saving, candidateKey: 'roll:source:expense:rule:expense-rule', ruleId: 'expense-rule', type: 'expense', amount: 200 };
+  const confirmation = savings.buildConfirmationRecords({ sessionId: 's1', candidates: [saving, expense], selectedKeys: new Set([saving.candidateKey, expense.candidateKey]), confirmedAt: '2026-01-01T00:00:00.000Z' });
+  assert.deepEqual(confirmation.ledgerEntries.map(entry => entry.type).sort(), ['expense', 'saving']);
+  assert.equal(confirmation.totals.net, 300);
+  assert.ok(confirmation.decisions.every(decision => decision.decision === 'accepted' && decision.ledgerEntryId));
+});
+
+test('input amount remains unresolved until confirmation and snapshot keeps resolved amount', () => {
+  const unresolved = savings.generateRollCandidates(context({ rules: [rule({ amountMode: 'input' })] }))[0];
+  assert.equal(unresolved.amount, null);
+  const resolved = { ...unresolved, amount: 300 };
+  const confirmation = savings.buildConfirmationRecords({ sessionId: 's1', candidates: [resolved], selectedKeys: new Set([resolved.candidateKey]), confirmedAt: '2026-01-01T00:00:00.000Z' });
+  assert.equal(confirmation.ledgerEntries[0].details[0].amount, 300);
+  const changedRule = { ...resolved.ruleSnapshot, amount: 999 };
+  assert.equal(confirmation.ledgerEntries[0].details[0].ruleSnapshot.amount, 500);
+  assert.equal(changedRule.amount, 999);
 });

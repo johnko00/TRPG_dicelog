@@ -194,8 +194,8 @@
           <div class="quick-item" onclick="setManualData('95-99', 100, 'saving', '🌧')">
              <div class="quick-icon">🌧</div><div class="quick-label">95-99</div><div class="quick-price">¥100</div>
           </div>
-          <div class="quick-item" onclick="setManualData('KP 1c', 1000, 'saving', '🐟')">
-             <div class="quick-icon">🐟</div><div class="quick-label">KP 1c</div><div class="quick-price">¥1,000</div>
+          <div class="quick-item" onclick="setManualData('GM 1c', 1000, 'saving', '🐟')">
+             <div class="quick-icon">🐟</div><div class="quick-label">GM 1c</div><div class="quick-price">¥1,000</div>
           </div>
           <div class="quick-item" onclick="setManualData('1卓完了', 500, 'saving', '🎉')">
              <div class="quick-icon">🎉</div><div class="quick-label">1卓</div><div class="quick-price">¥500</div>
@@ -216,9 +216,6 @@
           <button id="btn-add-manual" style="padding: 10px 30px;">記録する</button>
         </div>
       </div>
-      
-      <!-- 未確定候補 -->
-      <div id="savings-candidates-container"></div>
       
       <!-- 画像3風 履歴リスト -->
       <div class="card" style="margin-top: 30px;">
@@ -1250,161 +1247,7 @@
       });
     }
 
-    // --- ★ リッチなSavings Engine ---
-    async function renderSavings(db) {
-      return new Promise(resolve => {
-        const tx = db.transaction(['rollRecords', 'pcs', 'pls', 'aliasMappings', 'sessions', 'sessionParticipants', 'rollOverrides', 'savingsRules', 'ledgerEntries'], 'readonly');
-        let rolls = [], pcs = [], pls = [], aliases = [], sessions = [], participants = [], overrides = [], rules = [], ledger = [];
-        tx.objectStore('rollRecords').getAll().onsuccess = e => rolls = e.target.result;
-        tx.objectStore('pcs').getAll().onsuccess = e => pcs = e.target.result;
-        tx.objectStore('pls').getAll().onsuccess = e => pls = e.target.result;
-        tx.objectStore('aliasMappings').getAll().onsuccess = e => aliases = e.target.result;
-        tx.objectStore('sessions').getAll().onsuccess = e => sessions = e.target.result;
-        tx.objectStore('sessionParticipants').getAll().onsuccess = e => participants = e.target.result;
-        tx.objectStore('rollOverrides').getAll().onsuccess = e => overrides = e.target.result;
-        tx.objectStore('savingsRules').getAll().onsuccess = e => rules = e.target.result;
-        tx.objectStore('ledgerEntries').getAll().onsuccess = e => ledger = e.target.result;
-        
-        tx.oncomplete = () => {
-          // ★ 履歴リストの描画 (画像3風のリストUI)
-          const hDiv = document.getElementById('savings-history-container');
-          if (ledger.length === 0) {
-            hDiv.innerHTML = '<p style="color:#94a3b8;">履歴はまだありません。</p>';
-          } else {
-            const sorted = [...ledger].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).reverse().slice(0, 50);
-            let html = `<div class="history-list">`;
-            sorted.forEach(e => {
-               const isSav = e.type === 'saving';
-               const iconObj = isSav ? '🐖' : '🛒';
-               const colorClass = isSav ? 'plus' : 'minus';
-               const sign = isSav ? '+' : '-';
-               const session = sessions.find(s => s.id === e.sessionId);
-               const label = e.label === '自動計算貯金' && session ? session.title : e.label;
-               
-               html += `
-                 <div class="history-item">
-                   <div class="hist-icon-wrap ${isSav ? '' : 'expense'}">${iconObj}</div>
-                   <div class="hist-info">
-                     <div class="hist-title">${label}</div>
-                     <div class="hist-sub">${e.date}</div>
-                   </div>
-                   <div class="hist-right">
-                     <div class="hist-amount ${colorClass}">${sign}¥${e.amount.toLocaleString()}</div>
-                     <button class="outline" style="padding:4px 8px; font-size:0.8em;" onclick="openLedgerDetail('${e.id}')">詳細</button>
-                     <button class="danger" style="padding:4px 8px; font-size:0.8em;" onclick="deleteLedgerEntry('${e.id}')">取消</button>
-                   </div>
-                 </div>`;
-            });
-            hDiv.innerHTML = html + `</div>`;
-            window._currentLedgers = sorted;
-          }
-
-          if (!myPlId) {
-            document.getElementById('savings-candidates-container').innerHTML = '<div class="help-text">自分のPLが設定されていません。設定タブから自分のPLを選択してください。</div>';
-            return resolve();
-          }
-
-          const savedCombos = new Set();
-          ledger.forEach(entry => {
-            if (entry.details) entry.details.forEach(d => { if (d.rollId && d.ruleId) savedCombos.add(d.rollId + '_' + d.ruleId); });
-          });
-
-          const candidatesBySession = {};
-          
-          TRPGIdentity.applyRollOverrides(rolls.filter(r => r.isJudgement && r.result !== 'unknown'), overrides).forEach(r => {
-            if (r.savingsExcluded) return;
-            const resolved = TRPGIdentity.resolveSpeaker({ rawSpeaker: r.rawSpeaker, sessionId: r.sessionId, mappings: aliases, pcs, pls, sessionParticipants: participants });
-            const pcId = resolved.pcId;
-            if (resolved.ignored || !pcId || resolved.sessionParticipant?.savingsExcluded) return;
-            const pc = pcs.find(p => p.id === pcId);
-            if (!pc || (resolved.plId || pc.plId) !== myPlId) return;
-
-            rules.filter(ru => ru.isEnabled).forEach(rule => {
-              if (savedCombos.has(r.id + '_' + rule.id)) return;
-              if (rule.condition.exactRolls && rule.condition.exactRolls.length > 0 && !rule.condition.exactRolls.includes(r.rolledValue)) return;
-              if (rule.condition.result && rule.condition.result.length > 0 && !rule.condition.result.includes(r.result)) return;
-              
-              if (!candidatesBySession[r.sessionId]) candidatesBySession[r.sessionId] = [];
-              candidatesBySession[r.sessionId].push({ 
-                id: generateId(), sessionId: r.sessionId, rollId: r.id, ruleId: rule.id,       
-                ruleNameSnapshot: rule.name, amount: rule.amount, skill: r.skillRaw, targetValue: r.targetValue, rolledValue: r.rolledValue, result: r.result 
-              });
-            });
-          });
-
-          const cDiv = document.getElementById('savings-candidates-container');
-          cDiv.innerHTML = '';
-
-          const sessionIds = Object.keys(candidatesBySession);
-          if (sessionIds.length === 0) {
-            cDiv.innerHTML = '<div class="card">現在、自動判定による未確定の貯金候補はありません。</div>';
-            return resolve();
-          }
-
-          sessionIds.forEach(sId => {
-            const sessionCands = candidatesBySession[sId];
-            const session = sessions.find(s => s.id === sId);
-            const sTitle = session ? session.title : '不明なシナリオ';
-            const sTotal = sessionCands.reduce((sum, c) => sum + c.amount, 0);
-            
-            const groupDiv = document.createElement('div');
-            groupDiv.style = "background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 16px; margin-bottom: 20px; overflow: hidden;";
-            
-            let listHtml = '';
-            sessionCands.forEach(c => {
-               listHtml += `
-                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                   <label style="display:flex; align-items:center; gap:15px; cursor:pointer;">
-                     <input type="checkbox" checked class="cand-check-${sId}" data-amount="${c.amount}" data-id="${c.id}"> 
-                     <span style="font-weight:bold;">${c.ruleNameSnapshot}</span>
-                   </label>
-                   <div style="text-align: right;">
-                     <strong style="color:var(--success); font-size:1.1em;">+¥${c.amount}</strong>
-                     <div style="font-size:0.8em; color:#94a3b8;">【${c.skill||'-'}】 出目:${c.rolledValue} [${c.result}]</div>
-                   </div>
-                 </div>`;
-            });
-
-            groupDiv.innerHTML = `
-              <div style="background: var(--card-bg); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color);">
-                <h3 style="margin: 0;">${sTitle}</h3>
-                <span style="color:var(--success); font-weight:bold; font-size:1.2em;" id="total-${sId}">+¥${sTotal.toLocaleString()}</span>
-              </div>
-              <div>
-                ${listHtml}
-                <div style="padding: 15px;"><button style="width: 100%;" onclick="confirmSessionSavings('${sId}')">このシナリオの貯金を確定する</button></div>
-              </div>
-            `;
-            
-            groupDiv.addEventListener('change', e => {
-              if (e.target.classList.contains(`cand-check-${sId}`)) {
-                const checked = Array.from(groupDiv.querySelectorAll(`.cand-check-${sId}:checked`));
-                const newTotal = checked.reduce((sum, chk) => sum + parseInt(chk.dataset.amount, 10), 0);
-                groupDiv.querySelector(`#total-${sId}`).textContent = `+¥${newTotal.toLocaleString()}`;
-              }
-            });
-            cDiv.appendChild(groupDiv);
-            if(!window._sessionCandidates) window._sessionCandidates = {};
-            window._sessionCandidates[sId] = sessionCands;
-          });
-          resolve();
-        };
-      });
-    }
-
-    window.confirmSessionSavings = function(sId) {
-      const checkedIds = Array.from(document.querySelectorAll(`.cand-check-${sId}:checked`)).map(cb => cb.dataset.id);
-      const valid = window._sessionCandidates[sId].filter(c => checkedIds.includes(c.id));
-      if (!valid.length) return alert('選択されていません');
-      const total = valid.reduce((s,c)=>s+c.amount,0);
-      if (!confirm(`合計 +${total}円を確定しますか？`)) return;
-      
-      db.transaction(['ledgerEntries'], 'readwrite').objectStore('ledgerEntries').add({ 
-        id: generateId(), date: new Date().toISOString().split('T')[0], type: 'saving', label: '自動計算貯金', amount: total, sessionId: sId, details: valid, createdAt: new Date().toISOString() 
-      }).transaction.oncomplete = () => { 
-        alert('保存しました'); renderDashboardSummary(db); renderSavings(db);
-      };
-    };
+    // --- Phase 3 savings review flow is implemented below. ---
 
     window.openLedgerDetail = function(ledgerId) {
       const entry = window._currentLedgers.find(e => e.id === ledgerId);
@@ -1416,7 +1259,7 @@
              <div><strong>${d.ruleNameSnapshot || d.note || d.label || '記録'}</strong><div style="font-size:0.85em; color:#94a3b8; margin-top:4px;">【${d.skillRaw||d.skill||'-'}】 目標:${d.targetValue||d.target||'-'} 出目:${d.rolledValue||d.roll||'-'} [${d.result||'-'}]</div></div>
              <strong style="color:${entry.type === 'expense' ? '#cbd5e1' : 'var(--success)'}; font-size:1.1em;">${entry.type === 'expense' ? '-' : '+'}¥${d.amount}</strong></div>`;
       });
-      document.getElementById('ledger-detail-info').textContent = `${entry.date} / ${entry.label} / 合計: +¥${entry.amount}`;
+      document.getElementById('ledger-detail-info').textContent = `${entry.date} / ${entry.label} / 合計: ${entry.type === 'expense' ? '-' : '+'}¥${entry.amount}`;
       document.getElementById('ledger-detail-list').innerHTML = html;
       document.getElementById('ledger-detail-modal-wrapper').classList.remove('hidden');
     };
@@ -1466,7 +1309,8 @@
       const target = document.getElementById('dashboard-pending-container');
       const summary = document.getElementById('savings-pending-summary');
       const pendingTotal = TRPGSavings.calculateReviewTotals((pending || []).map(candidate => ({ ...candidate, amount: candidate.amount || 0 })));
-      if (summary) summary.innerHTML = pending?.length ? `<strong>未確認候補 ${pending.length}件</strong>（合計 +¥${pendingTotal.net.toLocaleString()}）` : '未確認の貯金候補はありません。';
+      const pendingUnpriced = (pending || []).filter(candidate => candidate.amount == null).length;
+      if (summary) summary.innerHTML = pending?.length ? `<strong>未確認候補 ${pending.length}件</strong>（入力済み候補 ${pendingTotal.net >= 0 ? '+' : ''}¥${pendingTotal.net.toLocaleString()}${pendingUnpriced ? ` / 金額未入力 ${pendingUnpriced}件` : ''}）` : '未確認の貯金候補はありません。';
       if (!target) return;
       const bySession = {};
       (pending || []).forEach(candidate => { if (!bySession[candidate.sessionId]) bySession[candidate.sessionId] = []; bySession[candidate.sessionId].push(candidate); });
@@ -1494,10 +1338,15 @@
       const manualEl = document.querySelector(`[data-review-manual="${sessionId}"]`);
       const expenseEl = document.querySelector(`[data-review-expense="${sessionId}"]`);
       const totalEl = document.querySelector(`[data-review-total="${sessionId}"]`);
+      const totalLabelEl = document.querySelector(`[data-review-total-label="${sessionId}"]`);
+      const unpricedEl = document.querySelector(`[data-review-unpriced="${sessionId}"]`);
+      const unpricedCount = automatic.filter(candidate => candidate.amount == null).length;
       if (autoEl) autoEl.textContent = `+¥${autoTotals.saving.toLocaleString()}`;
       if (manualEl) manualEl.textContent = `+¥${manualTotals.saving.toLocaleString()}`;
       if (expenseEl) expenseEl.textContent = `-¥${totals.expense.toLocaleString()}`;
-      if (totalEl) totalEl.textContent = `${totals.net >= 0 ? '+' : ''}¥${totals.net.toLocaleString()}`;
+      if (unpricedEl) unpricedEl.textContent = unpricedCount ? `金額未入力 ${unpricedCount}件（確定前に入力が必要です）` : '';
+      if (totalLabelEl) totalLabelEl.textContent = totals.expense > 0 ? '今回の増減' : '今回の貯金金額';
+      if (totalEl) totalEl.textContent = unpricedCount ? '金額入力待ち' : `${totals.net >= 0 ? '+' : ''}¥${totals.net.toLocaleString()}`;
     }
 
     function phase3RenderReviews(pending, sessions, rules) {
@@ -1521,7 +1370,7 @@
         const candidateRows = candidates.map(candidate => `<label style="display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid rgba(255,255,255,.06);"><input type="checkbox" data-review-candidate="${candidate.candidateKey}" data-session="${sessionId}" ${state.selectedKeys.has(candidate.candidateKey) ? 'checked' : ''}><span style="flex:1;"><strong>${candidate.ruleNameSnapshot}</strong><br><small style="color:#94a3b8;">${candidate.pcNameSnapshot || '対象character未設定'} / ${candidate.role || 'role未設定'} 【${candidate.skillRaw || 'session trigger'}】 出目:${candidate.rolledValue ?? '-'} ${candidate.result || ''}</small></span><strong style="color:${candidate.type === 'expense' ? '#cbd5e1' : 'var(--accent-color)'};">${candidate.amount == null ? '金額入力' : `${candidate.type === 'expense' ? '-' : '+'}¥${candidate.amount.toLocaleString()}`}</strong></label>`).join('');
         const manualRows = (state.manualItems || []).map(item => `<div style="display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid rgba(255,255,255,.06);"><span style="flex:1;">${item.label}</span><strong>${item.type === 'expense' ? '-' : '+'}¥${Number(item.amount).toLocaleString()}</strong><button class="danger outline" data-action="remove-manual" data-session="${sessionId}" data-id="${item.id}">削除</button></div>`).join('');
         const quickRules = manualRules.map(rule => `<button class="outline" data-action="add-rule-manual" data-session="${sessionId}" data-rule="${rule.id}">${rule.icon || '✨'} ${rule.name} ${rule.amountMode === 'fixed' ? `+¥${rule.amount.toLocaleString()}` : '金額入力'}</button>`).join(' ');
-        return `<div class="card" style="margin-bottom:20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><h2 style="margin:0;">今回の貯金</h2><p style="color:#94a3b8;margin:4px 0;">${session?.title || 'セッション'}</p></div><div style="text-align:right;"><div style="color:#94a3b8;">今回の貯金金額</div><strong data-review-total="${sessionId}" style="font-size:2em;color:var(--accent-color);">¥0</strong></div></div><div style="margin-top:15px;border:1px solid var(--border-color);border-radius:10px;overflow:hidden;"><h3 style="padding:12px;margin:0;background:rgba(0,0,0,.2);">🎲 自動で見つかったもの</h3>${candidateRows || '<p style="padding:12px;color:#94a3b8;">自動候補はありません。</p>'}</div><div style="margin-top:15px;border:1px solid var(--border-color);border-radius:10px;overflow:hidden;"><h3 style="padding:12px;margin:0;background:rgba(0,0,0,.2);">＋ 手動イベント</h3>${manualRows || '<p style="padding:12px;color:#94a3b8;">手動追加はありません。</p>'}<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px;"><input data-manual-label="${sessionId}" placeholder="内容" style="flex:1;min-width:130px;"><input data-manual-amount="${sessionId}" type="number" min="0" placeholder="金額" style="width:100px;"><select data-manual-type="${sessionId}"><option value="saving">貯金</option><option value="expense">支出</option></select><button data-action="add-manual" data-session="${sessionId}">追加</button></div><div style="display:flex;gap:8px;flex-wrap:wrap;padding:0 12px 12px;">${quickRules}</div></div><div style="display:flex;gap:20px;justify-content:flex-end;padding-top:15px;color:#cbd5e1;">自動候補 <strong data-review-auto="${sessionId}">+¥0</strong>　手動追加 <strong data-review-manual="${sessionId}">+¥0</strong>　出費 <strong data-review-expense="${sessionId}">-¥0</strong></div><button style="width:100%;margin-top:15px;" data-action="confirm-review" data-session="${sessionId}">この内容で確定する</button></div>`;
+        return `<div class="card" style="margin-bottom:20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><h2 style="margin:0;">今回の貯金</h2><p style="color:#94a3b8;margin:4px 0;">${session?.title || 'セッション'}</p></div><div style="text-align:right;"><div data-review-total-label="${sessionId}" style="color:#94a3b8;">今回の貯金金額</div><strong data-review-total="${sessionId}" style="font-size:2em;color:var(--accent-color);">¥0</strong><div data-review-unpriced="${sessionId}" style="color:#fbbf24;min-height:1.2em;"></div></div></div><div style="margin-top:15px;border:1px solid var(--border-color);border-radius:10px;overflow:hidden;"><h3 style="padding:12px;margin:0;background:rgba(0,0,0,.2);">🎲 自動で見つかったもの</h3>${candidateRows || '<p style="padding:12px;color:#94a3b8;">自動候補はありません。</p>'}</div><div style="margin-top:15px;border:1px solid var(--border-color);border-radius:10px;overflow:hidden;"><h3 style="padding:12px;margin:0;background:rgba(0,0,0,.2);">＋ 手動イベント</h3>${manualRows || '<p style="padding:12px;color:#94a3b8;">手動追加はありません。</p>'}<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px;"><input data-manual-label="${sessionId}" placeholder="内容" style="flex:1;min-width:130px;"><input data-manual-amount="${sessionId}" type="number" min="0" placeholder="金額" style="width:100px;"><select data-manual-type="${sessionId}"><option value="saving">貯金</option><option value="expense">支出</option></select><button data-action="add-manual" data-session="${sessionId}">追加</button></div><div style="display:flex;gap:8px;flex-wrap:wrap;padding:0 12px 12px;">${quickRules}</div></div><div style="display:flex;gap:20px;justify-content:flex-end;padding-top:15px;color:#cbd5e1;">自動候補 <strong data-review-auto="${sessionId}">+¥0</strong>　手動追加 <strong data-review-manual="${sessionId}">+¥0</strong>　出費 <strong data-review-expense="${sessionId}">-¥0</strong></div><button style="width:100%;margin-top:15px;" data-action="confirm-review" data-session="${sessionId}">この内容で確定する</button></div>`;
       }).join('');
       container.innerHTML = html || '<div class="card">未確認の貯金候補はありません。ログを取り込むか、設定からmanual ruleを追加してください。</div>';
       Object.keys(grouped).forEach(sessionId => phase3UpdateReviewTotal(sessionId));
@@ -1562,14 +1411,9 @@
       if (!items.length && !state.candidates.length) return alert('候補または手動イベントを1件以上選択してください。');
       if (!confirm(`今回の貯金金額 ${totals.net >= 0 ? '+' : ''}¥${totals.net.toLocaleString()}\n自動候補 ${resolvedSelected.length}件 / 手動追加 ${(state.manualItems || []).length}件\nこの内容で確定しますか？`)) return;
       const now = new Date().toISOString();
-      const savingItems = items.filter(item => item.type !== 'expense').map(TRPGSavings.buildLedgerSnapshot);
-      const expenseItems = items.filter(item => item.type === 'expense').map(TRPGSavings.buildLedgerSnapshot);
-      const ledgerEntries = [];
-      if (savingItems.length) ledgerEntries.push({ id: generateId(), sessionId, date: now.split('T')[0], type: 'saving', amount: savingItems.reduce((sum, item) => sum + Number(item.amount || 0), 0), label: 'TRPG貯金', details: savingItems, createdAt: now });
-      if (expenseItems.length) ledgerEntries.push({ id: generateId(), sessionId, date: now.split('T')[0], type: 'expense', amount: expenseItems.reduce((sum, item) => sum + Number(item.amount || 0), 0), label: 'TRPG関連支出', details: expenseItems, createdAt: now });
-      const acceptedLedgerId = new Map();
-      ledgerEntries.forEach(entry => entry.details.forEach(detail => { if (detail.candidateKey) acceptedLedgerId.set(detail.candidateKey, entry.id); }));
-      const decisions = state.candidates.map(candidate => ({ id: generateId(), candidateKey: candidate.candidateKey, sessionId, decision: state.selectedKeys.has(candidate.candidateKey) ? 'accepted' : 'dismissed', ledgerEntryId: acceptedLedgerId.get(candidate.candidateKey) || null, decidedAt: now }));
+      const confirmation = TRPGSavings.buildConfirmationRecords({ sessionId, candidates: resolvedSelected.length ? state.candidates.map(candidate => resolvedSelected.find(item => item.candidateKey === candidate.candidateKey) || candidate) : state.candidates, selectedKeys: state.selectedKeys, manualItems: state.manualItems || [], confirmedAt: now });
+      const ledgerEntries = confirmation.ledgerEntries;
+      const decisions = confirmation.decisions;
       const tx = db.transaction(['ledgerEntries', 'savingsCandidateDecisions'], 'readwrite');
       ledgerEntries.forEach(entry => tx.objectStore('ledgerEntries').add(entry)); decisions.forEach(decision => tx.objectStore('savingsCandidateDecisions').add(decision));
       tx.oncomplete = () => { delete phase3ReviewStates[sessionId]; renderDashboardSummary(db); renderSavings(db); };
