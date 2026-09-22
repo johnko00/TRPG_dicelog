@@ -39,8 +39,22 @@
     return stableHash([channel, speaker, rawText].join('\u241f'));
   }
 
-  function deriveLineageId(items) {
-    return `lineage:${stableHash((items || []).map(item => messageFingerprint(item)).join('\u241e'))}`;
+  function deriveRevisionFingerprint(items) {
+    return stableHash((items || []).map(item => messageFingerprint(item)).join('\u241e'));
+  }
+
+  function createLineageId() {
+    const randomId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : stableHash(`${Date.now()}:${Math.random()}`);
+    return `lineage:${randomId}`;
+  }
+
+  // A lineage identifies a log series, not one file revision. New imports get
+  // a fresh lineage; callers handling a known revision must pass lineageId.
+  // deriveRevisionFingerprint is the content-based value for one revision.
+  function deriveLineageId(_items, options) {
+    return options?.existingLineageId || createLineageId();
   }
 
   function buildSourceKey(lineageId, fingerprint, occurrence, sourceRollIndex) {
@@ -50,7 +64,7 @@
   function attachStableIdentity(items, options) {
     const list = Array.isArray(items) ? items : [];
     const config = options || {};
-    const lineageId = config.lineageId || deriveLineageId(list);
+    const lineageId = config.lineageId || createLineageId();
     const occurrences = new Map();
     list.forEach(item => {
       const fingerprint = messageFingerprint(item);
@@ -144,6 +158,8 @@
     normalizeSpeakerName,
     stableHash,
     messageFingerprint,
+    deriveRevisionFingerprint,
+    createLineageId,
     deriveLineageId,
     buildSourceKey,
     attachStableIdentity,

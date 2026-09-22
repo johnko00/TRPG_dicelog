@@ -37,6 +37,44 @@ test('duplicate occurrences and Xn roll indexes produce distinct source keys', (
   assert.equal(new Set(roll.rollData.rolls.map(r => r.sourceKey)).size, roll.rollData.rolls.length);
 });
 
+test('append revision keeps existing message and roll source keys', () => {
+  const lineageId = 'lineage:append';
+  const makeMessage = text => ({ itemType: 'message', channel: '[main]', rawSpeaker: 'A', rawText: text, body: text });
+  const oldRevision = [makeMessage('A'), makeMessage('B'), makeMessage('C')];
+  const newRevision = [makeMessage('A'), makeMessage('B'), makeMessage('C'), makeMessage('D'), makeMessage('E')];
+  identity.attachStableIdentity(oldRevision, { lineageId });
+  identity.attachStableIdentity(newRevision, { lineageId });
+  assert.deepEqual(newRevision.slice(0, 3).map(item => item.sourceMessageKey), oldRevision.map(item => item.sourceMessageKey));
+  assert.equal(newRevision[3].sourceMessageKey === oldRevision[2].sourceMessageKey, false);
+
+  const oldDuplicate = [makeMessage('same'), makeMessage('same')];
+  const newDuplicate = [makeMessage('same'), makeMessage('same'), makeMessage('same')];
+  identity.attachStableIdentity(oldDuplicate, { lineageId });
+  identity.attachStableIdentity(newDuplicate, { lineageId });
+  assert.deepEqual(newDuplicate.slice(0, 2).map(item => item.sourceMessageKey), oldDuplicate.map(item => item.sourceMessageKey));
+  assert.notEqual(newDuplicate[2].sourceMessageKey, oldDuplicate[1].sourceMessageKey);
+
+  const oldXn = parser.parseMessage({ rawSpeaker: 'A', body: 'X2 sccb<=30 正気度喪失 #1 (1D100<=30) ＞ 31 ＞ 失敗 #2 (1D100<=30) ＞ 12 ＞ 成功' });
+  const newXn = parser.parseMessage({ rawSpeaker: 'A', body: 'X2 sccb<=30 正気度喪失 #1 (1D100<=30) ＞ 31 ＞ 失敗 #2 (1D100<=30) ＞ 12 ＞ 成功' });
+  identity.attachStableIdentity([oldXn], { lineageId });
+  identity.attachStableIdentity([newXn, makeMessage('new')], { lineageId });
+  assert.deepEqual(newXn.rollData.rolls.map(roll => roll.sourceKey), oldXn.rollData.rolls.map(roll => roll.sourceKey));
+});
+
+test('id-keyed alias storage permits global and two session mappings for one normalized speaker', () => {
+  const records = [
+    { id: 'global-1', rawSpeakerNormalized: '探索者', scope: 'global', sessionId: null, pcId: 'pc-global' },
+    { id: 'session-a', rawSpeakerNormalized: '探索者', scope: 'session', sessionId: 'session-a', pcId: 'pc-a' },
+    { id: 'session-b', rawSpeakerNormalized: '探索者', scope: 'session', sessionId: 'session-b', pcId: 'pc-b' }
+  ];
+  const store = new Map(records.map(record => [record.id, record]));
+  assert.equal(store.size, 3);
+  const mappings = [...store.values()];
+  assert.equal(identity.resolveSpeaker({ rawSpeaker: '探索者', sessionId: 'session-a', mappings }).pcId, 'pc-a');
+  assert.equal(identity.resolveSpeaker({ rawSpeaker: '探索者', sessionId: 'session-b', mappings }).pcId, 'pc-b');
+  assert.equal(identity.resolveSpeaker({ rawSpeaker: '探索者', sessionId: 'session-c', mappings }).pcId, 'pc-global');
+});
+
 function resolver(overrides = {}) {
   return identity.resolveSpeaker({
     rawSpeaker: '探索者', sessionId: 'session-a',

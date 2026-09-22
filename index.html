@@ -340,7 +340,7 @@
           (async () => {
             for (const [sourceLogId, items] of grouped.entries()) {
               const source = bySource.get(sourceLogId);
-              const lineageId = source?.lineageId || TRPGIdentity.deriveLineageId(items);
+              const lineageId = source?.lineageId || TRPGIdentity.createLineageId();
               TRPGIdentity.attachStableIdentity(items, { lineageId });
               await new Promise(done => {
                 const parsedStore = database.transaction(['parsedItems', 'rollRecords'], 'readwrite');
@@ -369,13 +369,30 @@
     // changing the existing store names or confirmed ledger records.
     const initDB = () => {
       return new Promise((resolve, reject) => {
-        const request = indexedDB.open('TRPGBankDB_v9', 2);
+        const request = indexedDB.open('TRPGBankDB_v9', 3);
         request.onupgradeneeded = (e) => {
           const database = e.target.result;
+          const upgradeTx = e.target.transaction;
           const storeNames = ['sessions', 'sourceLogs', 'rollRecords', 'ledgerEntries', 'parsedItems', 'statusChanges', 'aliasMappings', 'pcs', 'pls', 'savingsRules', 'sessionParticipants', 'rollOverrides'];
+          const aliasExists = database.objectStoreNames.contains('aliasMappings');
+          const aliasNeedsRekey = aliasExists && upgradeTx.objectStore('aliasMappings').keyPath !== 'id';
+          const createAliasIndexes = store => {
+            if (!store.indexNames.contains('rawSpeakerNormalized')) store.createIndex('rawSpeakerNormalized', 'rawSpeakerNormalized', { unique: false });
+            if (!store.indexNames.contains('scope')) store.createIndex('scope', 'scope', { unique: false });
+            if (!store.indexNames.contains('sessionId')) store.createIndex('sessionId', 'sessionId', { unique: false });
+            if (!store.indexNames.contains('speakerScope')) store.createIndex('speakerScope', ['rawSpeakerNormalized', 'scope'], { unique: false });
+            if (!store.indexNames.contains('speakerScopeSession')) store.createIndex('speakerScopeSession', ['rawSpeakerNormalized', 'scope', 'sessionId'], { unique: false });
+          };
+          const normalizeAliasRecord = (value, now, usedIds) => {
+            const normalized = TRPGIdentity.normalizeSpeakerName(value.rawSpeakerNormalized || value.rawNameNormalized || '');
+            let id = value.id || '';
+            if (!id || usedIds?.has(id)) id = generateId();
+            usedIds?.add(id);
+            return { ...value, id, rawNameNormalized: value.rawNameNormalized || normalized, rawSpeakerNormalized: normalized, rawSpeakerExample: value.rawSpeakerExample || value.rawNameExamples?.[0] || normalized, scope: value.scope || 'global', sessionId: value.sessionId || null, ignored: Boolean(value.ignored), createdAt: value.createdAt || now, updatedAt: value.updatedAt || now };
+          };
           storeNames.forEach(name => {
-            if (!database.objectStoreNames.contains(name)) {
-              const opts = { keyPath: name === 'aliasMappings' ? 'rawNameNormalized' : 'id' };
+            if (!database.objectStoreNames.contains(name) && name !== 'aliasMappings') {
+              const opts = { keyPath: 'id' };
               const store = database.createObjectStore(name, opts);
               if (name === 'sourceLogs') {
                 store.createIndex('fileHash', 'fileHash', { unique: true });
@@ -400,6 +417,22 @@
               }
             }
           });
+          if (!aliasExists) {
+            const store = database.createObjectStore('aliasMappings', { keyPath: 'id' });
+            createAliasIndexes(store);
+          } else if (aliasNeedsRekey) {
+            const legacyStore = upgradeTx.objectStore('aliasMappings');
+            legacyStore.getAll().onsuccess = event => {
+              const records = event.target.result || [];
+              database.deleteObjectStore('aliasMappings');
+              const store = database.createObjectStore('aliasMappings', { keyPath: 'id' });
+              createAliasIndexes(store);
+              const usedIds = new Set();
+              records.forEach(record => store.put(normalizeAliasRecord(record, new Date().toISOString(), usedIds)));
+            };
+          } else {
+            createAliasIndexes(upgradeTx.objectStore('aliasMappings'));
+          }
           const now = new Date().toISOString();
           if (database.objectStoreNames.contains('sourceLogs')) {
             const store = e.target.transaction.objectStore('sourceLogs');
@@ -410,7 +443,7 @@
               const cursor = event.target.result;
               if (!cursor) return;
               const value = cursor.value;
-              if (!value.lineageId) value.lineageId = value.fileHash ? `lineage:${value.fileHash}` : generateId();
+              if (!value.lineageId) value.lineageId = TRPGIdentity.createLineageId();
               if (!value.contentFingerprint) value.contentFingerprint = value.fileHash || null;
               if (!value.parserVersion) value.parserVersion = value.parseVersion || TRPGParser.PARSER_VERSION;
               cursor.update(value);
@@ -445,23 +478,14 @@
               cursor.continue();
             };
           }
-          if (database.objectStoreNames.contains('aliasMappings')) {
+          if (database.objectStoreNames.contains('aliasMappings') && !aliasNeedsRekey) {
             const store = e.target.transaction.objectStore('aliasMappings');
-            if (!store.indexNames.contains('rawSpeakerNormalized')) store.createIndex('rawSpeakerNormalized', 'rawSpeakerNormalized', { unique: false });
-            if (!store.indexNames.contains('scope')) store.createIndex('scope', 'scope', { unique: false });
-            if (!store.indexNames.contains('sessionId')) store.createIndex('sessionId', 'sessionId', { unique: false });
+            createAliasIndexes(store);
+            const usedIds = new Set();
             store.openCursor().onsuccess = event => {
               const cursor = event.target.result;
               if (!cursor) return;
-              const value = cursor.value;
-              value.id = value.id || value.rawNameNormalized || generateId();
-              value.rawSpeakerNormalized = value.rawSpeakerNormalized || value.rawNameNormalized || '';
-              value.rawSpeakerExample = value.rawSpeakerExample || value.rawNameExamples?.[0] || value.rawSpeakerNormalized;
-              value.scope = value.scope || 'global';
-              value.sessionId = value.sessionId || null;
-              value.ignored = Boolean(value.ignored);
-              value.createdAt = value.createdAt || now;
-              value.updatedAt = value.updatedAt || now;
+              const value = normalizeAliasRecord(cursor.value, now, usedIds);
               cursor.update(value);
               cursor.continue();
             };
@@ -559,7 +583,7 @@
           if (e.target.result) return reject(new Error(`「${file.name}」は既に取り込まれています。`));
           const rawHtml = await file.text();
           const parsedItems = parseCcfoliaHtml(rawHtml);
-          const lineageId = TRPGIdentity.deriveLineageId(parsedItems);
+          const lineageId = TRPGIdentity.createLineageId();
           TRPGIdentity.attachStableIdentity(parsedItems, { lineageId });
           resolve({ fileName: file.name, fileHash, rawHtml, lineageId, contentFingerprint: TRPGIdentity.stableHash(rawHtml), parsedItems });
         };
@@ -570,7 +594,7 @@
       return new Promise((resolve, reject) => {
         const tx = db.transaction(['sessions', 'sourceLogs', 'parsedItems', 'rollRecords', 'statusChanges', 'aliasMappings'], 'readwrite');
         const sessionId = generateId(), sourceLogId = generateId();
-        const lineageId = parsedData.lineageId || TRPGIdentity.deriveLineageId(parsedData.parsedItems);
+        const lineageId = parsedData.lineageId || TRPGIdentity.createLineageId();
         TRPGIdentity.attachStableIdentity(parsedData.parsedItems, { lineageId });
         
         tx.objectStore('sessions').add({ id: sessionId, title: parsedData.fileName.replace(/\.html$/i, ''), dateStart: new Date().toISOString().split('T')[0], dateEnd: null, systemHints: [], sourceLogIds: [sourceLogId], imageAssetId: null, memo: '', tags: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
@@ -596,7 +620,7 @@
 
         const aliasStore = tx.objectStore('aliasMappings');
         uniqueNames.forEach((rawName, normalized) => {
-          aliasStore.get(normalized).onsuccess = (e) => {
+          aliasStore.index('speakerScope').get([normalized, 'global']).onsuccess = (e) => {
             if (!e.target.result) aliasStore.add({ id: generateId(), rawNameNormalized: normalized, rawSpeakerNormalized: normalized, rawSpeakerExample: rawName, rawNameExamples: [rawName], pcId: null, plId: null, scope: 'global', sessionId: null, ignored: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
           };
         });
@@ -848,7 +872,7 @@
     function setAliasIgnored(normalized, ignored) {
       const tx = db.transaction(['aliasMappings'], 'readwrite');
       const store = tx.objectStore('aliasMappings');
-      store.get(normalized).onsuccess = event => {
+      store.index('speakerScope').get([normalized, 'global']).onsuccess = event => {
         const mapping = event.target.result || { id: generateId(), rawNameNormalized: normalized, rawSpeakerNormalized: normalized, pcId: null, scope: 'global', sessionId: null, createdAt: new Date().toISOString() };
         mapping.ignored = Boolean(ignored); mapping.updatedAt = new Date().toISOString(); store.put(mapping);
       };
@@ -904,7 +928,7 @@
       const plId = document.getElementById('link-pc-pl').value || null; const tx = db.transaction(['pcs', 'aliasMappings'], 'readwrite'); const pcStore = tx.objectStore('pcs'); const aliasStore = tx.objectStore('aliasMappings');
       activeAliasNames.forEach(aliasName => {
         const newPcId = generateId(); const now = new Date().toISOString(); pcStore.add({ id: newPcId, name: aliasName, plId: plId, aliases: [aliasName], type: "CHARACTER", excludedFromSavings: false, memo: "", imageAssetId: null, createdAt: now, updatedAt: now });
-        aliasStore.get(aliasName).onsuccess = e => { const mapping = e.target.result || { id: generateId(), rawNameNormalized: aliasName, rawSpeakerNormalized: aliasName, rawSpeakerExample: aliasName, scope: 'global', sessionId: null, ignored: false, createdAt: new Date().toISOString() }; mapping.pcId = newPcId; mapping.plId = plId; mapping.updatedAt = new Date().toISOString(); aliasStore.put(mapping); };
+        aliasStore.index('speakerScope').get([aliasName, 'global']).onsuccess = e => { const mapping = e.target.result || { id: generateId(), rawNameNormalized: aliasName, rawSpeakerNormalized: aliasName, rawSpeakerExample: aliasName, scope: 'global', sessionId: null, ignored: false, createdAt: new Date().toISOString() }; mapping.pcId = newPcId; mapping.plId = plId; mapping.updatedAt = new Date().toISOString(); aliasStore.put(mapping); };
       });
       tx.oncomplete = () => { document.getElementById('link-modal-wrapper').classList.add('hidden'); loadPeopleData(db); };
     });
@@ -912,7 +936,7 @@
     function applyPcLink(aliasNames, pcId, plId) {
       const tx = db.transaction(['aliasMappings', 'pcs'], 'readwrite');
       if (pcId && plId) { tx.objectStore('pcs').get(pcId).onsuccess = e => { if (e.target.result) { e.target.result.plId = plId; e.target.result.updatedAt = new Date().toISOString(); tx.objectStore('pcs').put(e.target.result); } }; }
-      aliasNames.forEach(name => { tx.objectStore('aliasMappings').get(name).onsuccess = e => { const mapping = e.target.result || { id: generateId(), rawNameNormalized: name, rawSpeakerNormalized: name, rawSpeakerExample: name, scope: 'global', sessionId: null, ignored: false, createdAt: new Date().toISOString() }; mapping.pcId = pcId; mapping.plId = plId; mapping.ignored = false; mapping.updatedAt = new Date().toISOString(); tx.objectStore('aliasMappings').put(mapping); }; });
+      aliasNames.forEach(name => { tx.objectStore('aliasMappings').index('speakerScope').get([name, 'global']).onsuccess = e => { const mapping = e.target.result || { id: generateId(), rawNameNormalized: name, rawSpeakerNormalized: name, rawSpeakerExample: name, scope: 'global', sessionId: null, ignored: false, createdAt: new Date().toISOString() }; mapping.pcId = pcId; mapping.plId = plId; mapping.ignored = false; mapping.updatedAt = new Date().toISOString(); tx.objectStore('aliasMappings').put(mapping); }; });
       tx.oncomplete = () => { document.getElementById('link-modal-wrapper').classList.add('hidden'); loadPeopleData(db); };
     }
 
@@ -932,7 +956,7 @@
     document.getElementById('btn-unlink-pc').addEventListener('click', () => {
       if (!confirm(`「${editingAliasName}」の紐付けを解除して未整理状態に戻しますか？`)) return;
       const tx = db.transaction(['aliasMappings'], 'readwrite');
-      tx.objectStore('aliasMappings').get(editingAliasName).onsuccess = e => { if (e.target.result) { e.target.result.pcId = null; tx.objectStore('aliasMappings').put(e.target.result); } };
+      tx.objectStore('aliasMappings').index('speakerScope').get([editingAliasName, 'global']).onsuccess = e => { if (e.target.result) { e.target.result.pcId = null; e.target.result.updatedAt = new Date().toISOString(); tx.objectStore('aliasMappings').put(e.target.result); } };
       tx.oncomplete = () => { document.getElementById('pc-edit-modal-wrapper').classList.add('hidden'); loadPeopleData(db); };
     });
     document.getElementById('btn-delete-pc').addEventListener('click', () => {
@@ -948,7 +972,7 @@
       if (!selectedPcId) return alert('紐付け先PCを選択してください。');
       const tx = db.transaction(['pcs', 'aliasMappings'], 'readwrite');
       tx.objectStore('pcs').get(selectedPcId).onsuccess = e => { const pc = e.target.result; if(pc) { pc.plId = selectedPlId; pc.excludedFromSavings = excluded; pc.updatedAt = new Date().toISOString(); tx.objectStore('pcs').put(pc); } };
-      tx.objectStore('aliasMappings').get(editingAliasName).onsuccess = e => { const mapping = e.target.result || { id: generateId(), rawNameNormalized: editingAliasName, rawSpeakerNormalized: editingAliasName, rawSpeakerExample: editingAliasName, scope: 'global', sessionId: null, ignored: false, createdAt: new Date().toISOString() }; mapping.pcId = selectedPcId; mapping.plId = selectedPlId; mapping.ignored = false; mapping.updatedAt = new Date().toISOString(); tx.objectStore('aliasMappings').put(mapping); };
+      tx.objectStore('aliasMappings').index('speakerScope').get([editingAliasName, 'global']).onsuccess = e => { const mapping = e.target.result || { id: generateId(), rawNameNormalized: editingAliasName, rawSpeakerNormalized: editingAliasName, rawSpeakerExample: editingAliasName, scope: 'global', sessionId: null, ignored: false, createdAt: new Date().toISOString() }; mapping.pcId = selectedPcId; mapping.plId = selectedPlId; mapping.ignored = false; mapping.updatedAt = new Date().toISOString(); tx.objectStore('aliasMappings').put(mapping); };
       tx.oncomplete = () => { document.getElementById('pc-edit-modal-wrapper').classList.add('hidden'); loadPeopleData(db); };
     });
 
