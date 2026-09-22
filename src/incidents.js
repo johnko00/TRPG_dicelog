@@ -318,6 +318,13 @@
     return { successStreakMax: summary.successStreakMax, failureStreakMax: summary.failureStreakMax };
   }
   function calculateMaxStatusDrops(incidents) {
+    if (!Array.isArray(incidents) && incidents && Array.isArray(incidents.statusChanges)) {
+      const rows = incidents.statusChanges.map(status => {
+        const before = numeric(status.before), after = numeric(status.after);
+        return { statusName: text(status.statusName || status.stat).toUpperCase(), drop: before === null || after === null ? 0 : Math.max(0, before - after) };
+      });
+      return { sanDropMax: rows.filter(row => row.statusName === 'SAN').reduce((max, row) => Math.max(max, row.drop), 0), hpDropMax: rows.filter(row => row.statusName === 'HP').reduce((max, row) => Math.max(max, row.drop), 0) };
+    }
     const summary = calculateIncidentSummary(incidents);
     return { sanDropMax: summary.sanDropMax, hpDropMax: summary.hpDropMax };
   }
