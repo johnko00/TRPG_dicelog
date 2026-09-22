@@ -119,6 +119,33 @@
     .progress-bar-bg { background: rgba(0,0,0,0.3); border-radius: 10px; height: 12px; width: 100%; overflow: hidden; margin-top: 10px; position: relative;}
     .progress-bar-fill { background: var(--accent-gradient); height: 100%; border-radius: 10px; transition: width 1s ease-out; }
 
+    /* === Phase 4 home dashboard === */
+    .dashboard-hero { background: linear-gradient(145deg, #30283d 0%, #1e1e2f 100%); position: relative; overflow: hidden; }
+    .dashboard-hero::after { content: '✦'; position: absolute; right: 28px; top: 20px; color: rgba(255,117,140,.28); font-size: 5rem; transform: rotate(18deg); }
+    .dashboard-balance { font-size: clamp(2.4rem, 6vw, 4rem); margin: 8px 0; color: #fff; letter-spacing: 1px; }
+    .dashboard-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .dashboard-stat { background: rgba(0,0,0,.18); border: 1px solid rgba(255,255,255,.06); border-radius: 16px; padding: 16px; }
+    .dashboard-stat-label { color: #94a3b8; font-size: .82rem; }
+    .dashboard-stat-value { color: #fff; font-size: 1.6rem; font-weight: 800; margin-top: 5px; }
+    .dashboard-stat-value.accent { color: var(--accent-color); }
+    .dashboard-stat-value.critical { color: #fde047; }
+    .dashboard-stat-value.fumble { color: #d8b4fe; }
+    .dashboard-month-nav { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+    .dashboard-month-title { font-size: 1.35rem; font-weight: 800; color:#fff; }
+    .dashboard-calendar-day { min-height: 128px; }
+    .dashboard-session-list { display:flex; flex-direction:column; gap:5px; position:relative; z-index:2; margin-top:5px; }
+    .dashboard-session-card { display:block; padding:5px 7px; border-radius:9px; background:rgba(0,0,0,.48); color:#fff; font-size:.78rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border:1px solid rgba(255,255,255,.08); }
+    .dashboard-session-card:hover { background:rgba(255,117,140,.32); }
+    .dashboard-day-badge { position:relative; z-index:3; align-self:flex-start; font-size:.68rem; padding:2px 6px; border-radius:10px; background:rgba(251,191,36,.2); color:#fbbf24; }
+    .dashboard-today { border-color: var(--accent-color) !important; box-shadow: 0 0 0 1px rgba(255,117,140,.35); }
+    .dashboard-empty { text-align:center; color:#94a3b8; padding:24px; }
+    .dashboard-event-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+    .dashboard-event { background:rgba(0,0,0,.2); border:1px solid rgba(255,255,255,.06); border-radius:14px; padding:14px; }
+    .dashboard-event-title { font-weight:800; color:#fff; }
+    .dashboard-event-meta { color:#94a3b8; font-size:.84rem; margin-top:5px; }
+    .dashboard-session-image { width:48px; height:48px; border-radius:12px; object-fit:cover; float:right; border:1px solid rgba(255,255,255,.2); }
+    @media (max-width: 800px) { .dashboard-stat-grid { grid-template-columns: repeat(2, 1fr); } .calendar-grid { gap:5px; } .dashboard-calendar-day { min-height:95px; padding:6px; } .dashboard-session-card { font-size:.68rem; padding:4px; } }
+
   </style>
 </head>
 <body>
@@ -139,34 +166,41 @@
     
     <!-- === ダッシュボード === -->
     <section id="dashboard">
-      <h1>Dashboard</h1>
-      
-      <div class="card" style="display: flex; gap: 30px; justify-content: space-between; flex-wrap: wrap; background: linear-gradient(145deg, #272738 0%, #1e1e2f 100%);">
-        <div style="flex: 1; min-width: 200px;">
-          <p style="margin:0; color:#94a3b8; font-weight:700; font-size:0.9em; text-transform:uppercase;">Total Balance</p>
-          <h2 id="total-balance" style="color: #fff; margin:5px 0 10px 0; font-size: 2.5em; font-weight:800;">計算中...</h2>
-          <div style="display:flex; justify-content: space-between; font-size: 0.9em; margin-bottom: 5px;">
-            <span style="color:var(--accent-color); font-weight:bold;">今月貯金: <span id="month-savings">0</span></span>
-            <span style="color:#cbd5e1;">支出: <span id="month-expenses">0</span></span>
-            <span style="color:#fff; font-weight:bold;">収支: <span id="month-balance">0円</span></span>
-          </div>
-          <div class="progress-bar-bg">
-            <div id="month-progress" class="progress-bar-fill" style="width: 0%;"></div>
-          </div>
+      <h1>ホーム</h1>
+      <div class="card dashboard-hero">
+        <p style="margin:0;color:#fda4af;font-weight:800;letter-spacing:1px;">TRPG貯金</p>
+        <div id="total-balance" class="dashboard-balance">計算中...</div>
+        <div id="dashboard-balance-caption" style="color:#cbd5e1;">confirmed ledgerの残高</div>
+        <div id="dashboard-month-net-caption" style="margin-top:12px;color:var(--accent-color);font-weight:800;">今月の増減を計算中...</div>
+      </div>
+
+      <div class="card">
+        <div class="dashboard-month-nav">
+          <button id="dashboard-prev-month" class="outline" aria-label="前月">‹</button>
+          <div id="dashboard-month-title" class="dashboard-month-title">表示月を読み込み中</div>
+          <button id="dashboard-next-month" class="outline" aria-label="次月">›</button>
         </div>
-        <div style="border-left: 2px solid rgba(255,255,255,0.05); padding-left: 30px; display:flex; flex-direction:column; justify-content:center;">
-          <p style="margin:0; color:#94a3b8; font-weight:700; font-size:0.9em;">今月のセッション</p>
-          <h2 id="month-stats" style="margin:5px 0 0 0; font-size: 2em; color: #fff;">-</h2>
+        <div id="dashboard-month-context" style="color:#94a3b8;margin-bottom:14px;">月間サマリー</div>
+        <div class="dashboard-stat-grid">
+          <div class="dashboard-stat"><div class="dashboard-stat-label">🎲 卓数</div><div id="month-session-count" class="dashboard-stat-value">0</div></div>
+          <div class="dashboard-stat"><div class="dashboard-stat-label">🎯 クリティカル</div><div id="month-critical" class="dashboard-stat-value critical">0</div></div>
+          <div class="dashboard-stat"><div class="dashboard-stat-label">💥 ファンブル</div><div id="month-fumble" class="dashboard-stat-value fumble">0</div></div>
+          <div class="dashboard-stat"><div class="dashboard-stat-label">💰 増減</div><div id="month-balance" class="dashboard-stat-value accent">¥0</div></div>
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:16px;color:#cbd5e1;font-size:.9rem;">
+          <span>判定ダイス <strong id="month-roll-count">0</strong></span><span>貯金 <strong id="month-savings">+¥0</strong></span><span>支出 <strong id="month-expenses">-¥0</strong></span>
         </div>
       </div>
-      
+
       <div class="card">
-        <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 15px;">
-          <h3>今月の推し貯金カレンダー</h3>
-        </div>
+        <div class="dashboard-month-nav"><h3 style="margin:0;">月間TRPGカレンダー</h3><span id="dashboard-calendar-note" style="color:#94a3b8;font-size:.85rem;">confirmed ledger / session.dateStart</span></div>
         <div id="calendar-container"></div>
       </div>
       <div id="dashboard-pending-container"></div>
+      <div class="card">
+        <h3>最近のダイス事件</h3>
+        <div id="dashboard-recent-events" class="dashboard-event-list"></div>
+      </div>
     </section>
     
     <!-- === TRPG貯金 === -->
@@ -312,6 +346,7 @@
   <script src="src/identity.js"></script>
   <script src="src/parser.js"></script>
   <script src="src/savings.js"></script>
+  <script src="src/dashboard.js"></script>
   <script>
     // --- クイック入力設定 ---
     function setManualData(label, amount, type, icon) {
@@ -1060,124 +1095,134 @@
       tx.oncomplete = () => { loadSavingsRules(db); renderSavings(db); };
     };
 
-    // --- ★ダッシュボード & グラフ ---
-    async function renderDashboardSummary(db) {
-      return new Promise(resolve => {
-        const tx = db.transaction(['ledgerEntries', 'sessions', 'rollRecords'], 'readonly');
-        let entries = [], sessions = [], rolls = [];
-        tx.objectStore('ledgerEntries').getAll().onsuccess = e => entries = e.target.result;
-        tx.objectStore('sessions').getAll().onsuccess = e => sessions = e.target.result;
-        tx.objectStore('rollRecords').getAll().onsuccess = e => rolls = e.target.result;
+    // --- Phase 4: home dashboard and calendar ---
+    const dashboardNow = new Date();
+    const dashboardState = { year: dashboardNow.getFullYear(), month: dashboardNow.getMonth() };
 
-        tx.oncomplete = () => {
-          const now = new Date();
-          const currentYear = now.getFullYear(), currentMonth = now.getMonth();
-          
-          let totalBal = 0, mBal = 0, mSav = 0, mExp = 0;
-          entries.forEach(e => {
-            const amt = e.type === 'saving' ? e.amount : -e.amount;
-            totalBal += amt;
-            const d = new Date(e.date);
-            if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
-              mBal += amt;
-              if (e.type === 'saving') mSav += e.amount;
-              else mExp += e.amount;
-            }
-          });
+    function phase4ReadDashboardData(database) {
+      return phase3ReadSavingsData(database);
+    }
 
-          const mSessions = sessions.filter(s => {
-            if (!s.dateStart) return false;
-            const d = new Date(s.dateStart); return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
-          });
-          const mSessionIds = mSessions.map(s => s.id);
-          const mRolls = rolls.filter(r => r.isJudgement && mSessionIds.includes(r.sessionId));
+    function phase4Escape(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+    }
 
-          document.getElementById('total-balance').textContent = `${totalBal >= 0 ? '+' : ''}${totalBal.toLocaleString()}円`;
-          document.getElementById('month-balance').textContent = `${mBal >= 0 ? '+' : ''}${mBal.toLocaleString()}円`;
-          document.getElementById('month-savings').textContent = `+${mSav.toLocaleString()}円`;
-          document.getElementById('month-expenses').textContent = `-${mExp.toLocaleString()}円`;
-          document.getElementById('month-stats').textContent = `${mSessions.length}卓 / ${mRolls.length}回`;
+    function phase4Money(value, sign = true) {
+      const amount = Number(value) || 0;
+      return `${sign && amount >= 0 ? '+' : ''}¥${amount.toLocaleString()}`;
+    }
 
-          // プログレスバーの更新
-          const totalMonthIO = mSav + mExp;
-          const savRatio = totalMonthIO > 0 ? (mSav / totalMonthIO) * 100 : 0;
-          document.getElementById('month-progress').style.width = `${savRatio}%`;
+    function phase4RenderPending(pending, sessions) {
+      const target = document.getElementById('dashboard-pending-container');
+      if (!target) return;
+      const grouped = TRPGDashboard.groupPendingBySession(pending, sessions);
+      const rows = Object.values(grouped).sort((a, b) => String(b.session?.dateStart || '').localeCompare(String(a.session?.dateStart || ''))).map(group => {
+        const title = group.session?.title || 'セッション';
+        const date = group.session?.dateStart ? phase4Escape(group.session.dateStart.slice(5).replace('-', '/')) : '日付未設定';
+        const known = phase4Money(group.knownAmount);
+        const unpriced = group.unpricedCount ? `<span class="badge warning">金額未入力 ${group.unpricedCount}件</span>` : '';
+        return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap;"><div><strong>未確認の貯金があります</strong><div style="color:#94a3b8;">${date} 『${phase4Escape(title)}』</div><div style="margin-top:5px;">候補 ${group.candidates.length}件 ${unpriced}</div></div><strong style="color:var(--accent-color);font-size:1.2em;">${known}</strong><button class="outline" data-dashboard-review="${phase4Escape(group.sessionId)}">確認する</button></div>`;
+      }).join('');
+      target.innerHTML = rows || '';
+    }
 
-          renderCalendar(entries, sessions, currentYear, currentMonth);
-          resolve();
-        };
+    function phase4RenderCalendar(data, pending) {
+      const target = document.getElementById('calendar-container');
+      if (!target) return;
+      const month = TRPGDashboard.buildCalendarMonth(dashboardState.year, dashboardState.month, { sessions: data.sessions, ledgerEntries: data.ledgerEntries, pending });
+      let html = '<div class="calendar-grid">';
+      ['日', '月', '火', '水', '木', '金', '土'].forEach(day => { html += `<div class="cal-header">${day}</div>`; });
+      for (let index = 0; index < month.leadingEmptyCount; index += 1) html += '<div></div>';
+      month.days.forEach(day => {
+        const firstImage = day.sessions.find(session => session.imageAssetId)?.imageAssetId;
+        const imageStyle = firstImage ? ` style="background-image:url('${phase4Escape(firstImage)}');"` : '';
+        const classes = `cal-day dashboard-calendar-day${day.isToday ? ' dashboard-today' : ''}${firstImage ? ' has-img' : ''}${day.hasContent ? ' has-data' : ''}`;
+        const sessionCards = day.sessions.slice(0, 2).map(session => `<span class="dashboard-session-card">${phase4Escape(session.title || 'セッション')}</span>`).join('');
+        const more = day.sessions.length > 2 ? `<span class="dashboard-session-card">+${day.sessions.length - 2}件</span>` : '';
+        const pendingBadge = day.pending.length ? `<span class="dashboard-day-badge">未確認 ${day.pending.length}</span>` : '';
+        const net = day.ledger.net;
+        const amount = net ? `<div class="cal-amounts"><span class="cal-amt ${net >= 0 ? 'plus' : 'minus'}">${phase4Money(net)}</span></div>` : '';
+        html += `<div class="${classes}"${imageStyle} role="button" tabindex="0" data-calendar-date="${day.dateKey}"><div class="cal-date">${day.day}</div>${pendingBadge}<div class="dashboard-session-list">${sessionCards}${more}</div>${amount}</div>`;
+      });
+      target.innerHTML = `${html}</div>`;
+      target.querySelectorAll('[data-calendar-date]').forEach(cell => {
+        cell.addEventListener('click', () => window.showCalendarDetail(cell.dataset.calendarDate));
+        cell.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') window.showCalendarDetail(cell.dataset.calendarDate); });
       });
     }
 
-    document.getElementById('btn-add-manual').addEventListener('click', () => {
-      const date = document.getElementById('manual-date').value, type = document.getElementById('manual-type').value, label = document.getElementById('manual-label').value, amount = parseInt(document.getElementById('manual-amount').value, 10);
-      if (!date || !label || isNaN(amount)) return alert('正しく入力してください。');
-      db.transaction(['ledgerEntries'], 'readwrite').objectStore('ledgerEntries').add({ id: generateId(), date, type, label, amount, sessionId: null, details: [], createdAt: new Date().toISOString() }).transaction.oncomplete = () => { 
-        alert('記録しました'); 
-        document.getElementById('manual-label').value = ''; document.getElementById('manual-amount').value = '';
-        renderDashboardSummary(db); renderSavings(db);
-      };
-    });
+    function phase4RenderRecentEvents(data) {
+      const target = document.getElementById('dashboard-recent-events');
+      if (!target) return;
+      const events = TRPGDashboard.buildRecentDiceEvents({ rolls: data.rollRecords, sessions: data.sessions, overrides: data.rollOverrides, limit: 5 });
+      const labels = { critical: '🎯 クリティカル！', fumble: '💥 ファンブル！', exact1: '🎯 出目1', exact100: '💯 出目100' };
+      target.innerHTML = events.length ? events.map(event => `<div class="dashboard-event"><div class="dashboard-event-title">${labels[event.kind] || '🎲 ダイス事件'}</div><div class="dashboard-event-meta">『${phase4Escape(event.session?.title || 'セッション')}』<br>${phase4Escape(event.rawSpeaker || '話者未設定')} / 【${phase4Escape(event.skillRaw || '技能未設定')}】<br>出目 ${event.rolledValue ?? '-'} ${phase4Escape(event.result || '')}</div></div>`).join('') : '<div class="dashboard-empty">まだダイス事件がありません。ログを追加すると、ここに記録が育っていきます。</div>';
+    }
 
-    // ★ 推し貯金風カレンダーの描画
-    function renderCalendar(entries, sessions, targetYear, targetMonth) {
-      const daily = {};
-      entries.forEach(en => {
-        const d = new Date(en.date);
-        if (d.getFullYear() === targetYear && d.getMonth() === targetMonth) {
-          const day = d.getDate();
-          if (!daily[day]) daily[day] = { saving: 0, expense: 0, images: [] };
-          daily[day][en.type] += en.amount;
-          
-          if (en.sessionId) {
-              const session = sessions.find(s => s.id === en.sessionId);
-              if (session && session.imageAssetId) daily[day].images.push(session.imageAssetId);
-          }
-        }
-      });
-      const days = new Date(targetYear, targetMonth + 1, 0).getDate();
-      
-      let html = `<div class="calendar-grid">`;
-      ['日', '月', '火', '水', '木', '金', '土'].forEach(w => html += `<div class="cal-header">${w}</div>`);
-      
-      const firstDay = new Date(targetYear, targetMonth, 1).getDay();
-      for(let i=0; i<firstDay; i++) html += `<div></div>`;
-      
-      for (let i = 1; i <= days; i++) {
-        const data = daily[i] || { saving: 0, expense: 0, images: [] };
-        const hasData = data.saving > 0 || data.expense > 0;
-        const imgStyle = data.images.length > 0 ? `background-image: url('${data.images[0]}');` : '';
-        const imgClass = data.images.length > 0 ? 'has-img' : '';
-        const dataClass = hasData ? 'has-data' : '';
-        const clickStr = hasData ? `onclick="showCalendarDetail('${targetYear}-${String(targetMonth+1).padStart(2,'0')}-${String(i).padStart(2,'0')}')"` : '';
-        
-        let amtsHtml = '';
-        if(data.saving > 0) amtsHtml += `<div class="cal-amt plus">+${data.saving.toLocaleString()}円</div>`;
-        if(data.expense > 0) amtsHtml += `<div class="cal-amt minus">-${data.expense.toLocaleString()}円</div>`;
-
-        html += `<div class="cal-day ${imgClass} ${dataClass}" style="${imgStyle}" ${clickStr}>
-            <div class="cal-date">${i}</div>
-            <div class="cal-amounts">${amtsHtml}</div>
-          </div>`;
+    async function renderDashboardSummary(database) {
+      try {
+        const data = await phase4ReadDashboardData(database);
+        const summary = TRPGDashboard.calculateMonthlySummary({ year: dashboardState.year, month: dashboardState.month, sessions: data.sessions, rolls: data.rollRecords, overrides: data.rollOverrides, ledgerEntries: data.ledgerEntries });
+        const balance = TRPGDashboard.calculateBalance(data.ledgerEntries);
+        const contextLabel = TRPGDashboard.monthLabel(dashboardState.year, dashboardState.month);
+        document.getElementById('total-balance').textContent = `${balance >= 0 ? '+' : ''}¥${balance.toLocaleString()}`;
+        document.getElementById('dashboard-month-title').textContent = `${dashboardState.year}年${dashboardState.month + 1}月`;
+        document.getElementById('dashboard-month-context').textContent = `${contextLabel === '今月' ? '今月の記録' : `${dashboardState.month + 1}月の記録`}`;
+        document.getElementById('dashboard-month-net-caption').textContent = `${contextLabel === '今月' ? '今月の増減' : `${dashboardState.month + 1}月の増減`}: ${phase4Money(summary.net)}`;
+        document.getElementById('month-session-count').textContent = summary.sessionCount;
+        document.getElementById('month-roll-count').textContent = summary.judgementRolls;
+        document.getElementById('month-critical').textContent = summary.critical;
+        document.getElementById('month-fumble').textContent = summary.fumble;
+        document.getElementById('month-savings').textContent = `+¥${summary.saving.toLocaleString()}`;
+        document.getElementById('month-expenses').textContent = `-¥${summary.expense.toLocaleString()}`;
+        document.getElementById('month-balance').textContent = phase4Money(summary.net);
+        const pending = phase3CandidateData(data);
+        phase4RenderCalendar(data, pending);
+        phase4RenderPending(pending, data.sessions);
+        phase4RenderRecentEvents(data);
+      } catch (error) {
+        const target = document.getElementById('dashboard-recent-events');
+        if (target) target.innerHTML = `<div class="dashboard-empty">ホームの読み込みに失敗しました: ${phase4Escape(error.message)}</div>`;
       }
-      document.getElementById('calendar-container').innerHTML = html + `</div>`;
     }
 
-    window.showCalendarDetail = function(dateStr) {
-      const tx = db.transaction(['ledgerEntries', 'sessions'], 'readonly');
-      let entries = [], sessions = [];
-      tx.objectStore('ledgerEntries').getAll().onsuccess = ev => entries = ev.target.result.filter(x => x.date === dateStr);
-      tx.objectStore('sessions').getAll().onsuccess = ev => sessions = ev.target.result;
-      tx.oncomplete = () => {
-        let s = 0, ex = 0, h = '<h4>貯金</h4><ul>';
-        entries.filter(x=>x.type==='saving').forEach(x => { s+=x.amount; h+=`<li>${sessions.find(ss=>ss.id===x.sessionId)?.title || x.label}: <span style="color:var(--success);">+${x.amount}円</span></li>`; });
-        h += '</ul><h4>支出</h4><ul>';
-        entries.filter(x=>x.type==='expense').forEach(x => { ex+=x.amount; h+=`<li>${x.label}: <span style="color:var(--danger);">-${x.amount}円</span></li>`; });
-        document.getElementById('calendar-detail-date').textContent = dateStr;
-        document.getElementById('calendar-detail-content').innerHTML = h + `</ul><hr><p style="font-size:1.2em; font-weight:bold;">収支: ${s-ex>=0?'+':''}${s-ex}円</p>`;
-        document.getElementById('calendar-detail-modal-wrapper').classList.remove('hidden');
-      };
-    };
+    async function phase4RenderDayDetail(dateKey) {
+      const data = await phase4ReadDashboardData(db);
+      const sessionsByDate = TRPGDashboard.groupSessionsByDate(data.sessions);
+      const daySessions = sessionsByDate[dateKey] || [];
+      const ledgerByDate = TRPGDashboard.groupLedgerByDisplayDate(data.ledgerEntries, data.sessions);
+      const dayLedger = ledgerByDate[dateKey] || { saving: 0, expense: 0, net: 0, entries: [] };
+      const participants = data.sessionParticipants || [];
+      const sessionBlocks = daySessions.map(session => {
+        const summary = TRPGDashboard.calculateSessionRollSummary(session.id, data.rollRecords, data.rollOverrides);
+        const sessionLedger = dayLedger.entries.filter(entry => entry.sessionId === session.id);
+        const people = participants.filter(participant => participant.sessionId === session.id).map(participant => {
+          const pc = (data.pcs || []).find(item => item.id === participant.pcId);
+          const pl = (data.pls || []).find(item => item.id === participant.plId || item.id === pc?.plId);
+          return `<li><strong>${phase4Escape(participant.role || '役割未設定')}</strong> ${phase4Escape(pc?.name || participant.rawSpeakerNormalized || '名前未設定')}${pl ? ` / PL ${phase4Escape(pl.name)}` : ''}</li>`;
+        }).join('');
+        const image = session.imageAssetId ? `<img class="dashboard-session-image" src="${phase4Escape(session.imageAssetId)}" alt="">` : '';
+        const ledgerText = sessionLedger.length ? sessionLedger.map(entry => `${phase4Escape(entry.label || '記録')} ${entry.type === 'expense' ? '-' : '+'}¥${Number(entry.amount || 0).toLocaleString()}`).join('<br>') : '確定ledgerなし';
+        return `<div class="card"><h3>${image}${phase4Escape(session.title || 'セッション')}</h3><p style="color:#94a3b8;">判定 ${summary.total} / 成功 ${summary.success} / 失敗 ${summary.failure} / クリティカル ${summary.critical} / ファンブル ${summary.fumble}</p><h4>参加者</h4><ul>${people || '<li>参加者情報なし</li>'}</ul><h4>確定貯金・支出</h4><p>${ledgerText}</p></div>`;
+      }).join('');
+      const manualEntries = dayLedger.entries.filter(entry => !entry.sessionId);
+      const manualBlock = manualEntries.length ? `<div class="card"><h3>セッション未紐付けの記録</h3>${manualEntries.map(entry => `<p>${phase4Escape(entry.label || '記録')} ${entry.type === 'expense' ? '-' : '+'}¥${Number(entry.amount || 0).toLocaleString()}</p>`).join('')}</div>` : '';
+      const diceCount = daySessions.reduce((sum, session) => sum + TRPGDashboard.calculateSessionRollSummary(session.id, data.rollRecords, data.rollOverrides).total, 0);
+      const title = `${dateKey} の記録`;
+      document.getElementById('calendar-detail-date').textContent = title;
+      document.getElementById('calendar-detail-content').innerHTML = `<p style="color:#94a3b8;">セッション ${daySessions.length}卓 / 判定 ${diceCount}回</p>${sessionBlocks || '<div class="dashboard-empty">この日のセッションはありません。</div>'}${manualBlock}<div class="card"><strong>日の増減 ${phase4Money(dayLedger.net)}</strong><br><small>貯金 +¥${dayLedger.saving.toLocaleString()} / 支出 -¥${dayLedger.expense.toLocaleString()}</small></div>`;
+      document.getElementById('calendar-detail-modal-wrapper').classList.remove('hidden');
+    }
+
+    window.showCalendarDetail = phase4RenderDayDetail;
+    document.getElementById('dashboard-prev-month').addEventListener('click', () => { if (dashboardState.month === 0) { dashboardState.year -= 1; dashboardState.month = 11; } else dashboardState.month -= 1; renderDashboardSummary(db); });
+    document.getElementById('dashboard-next-month').addEventListener('click', () => { if (dashboardState.month === 11) { dashboardState.year += 1; dashboardState.month = 0; } else dashboardState.month += 1; renderDashboardSummary(db); });
+    document.getElementById('dashboard-pending-container').addEventListener('click', event => {
+      const button = event.target.closest('[data-dashboard-review]');
+      if (!button) return;
+      document.querySelector('li[data-target="savings"]').click();
+      setTimeout(() => document.querySelector(`[data-review-session="${button.dataset.dashboardReview}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+    });
 
     // --- Analysis ---
     const SUCCESS_RESULTS = ['critical', 'special', 'success', 'hard', 'extreme'], FAILURE_RESULTS = ['failure', 'fumble'];
@@ -1262,11 +1307,6 @@
       document.getElementById('ledger-detail-info').textContent = `${entry.date} / ${entry.label} / 合計: ${entry.type === 'expense' ? '-' : '+'}¥${entry.amount}`;
       document.getElementById('ledger-detail-list').innerHTML = html;
       document.getElementById('ledger-detail-modal-wrapper').classList.remove('hidden');
-    };
-
-    window.deleteLedgerEntry = function(id) {
-      if (!confirm('この履歴を取り消しますか？\n自動計算分だった場合、再び未確定の候補として表示されます。')) return;
-      db.transaction(['ledgerEntries'], 'readwrite').objectStore('ledgerEntries').delete(id).transaction.oncomplete = () => { renderDashboardSummary(db); renderSavings(db); };
     };
 
     // --- Phase 3: candidate review and confirmed ledger snapshots ---
@@ -1370,7 +1410,7 @@
         const candidateRows = candidates.map(candidate => `<label style="display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid rgba(255,255,255,.06);"><input type="checkbox" data-review-candidate="${candidate.candidateKey}" data-session="${sessionId}" ${state.selectedKeys.has(candidate.candidateKey) ? 'checked' : ''}><span style="flex:1;"><strong>${candidate.ruleNameSnapshot}</strong><br><small style="color:#94a3b8;">${candidate.pcNameSnapshot || '対象character未設定'} / ${candidate.role || 'role未設定'} 【${candidate.skillRaw || 'session trigger'}】 出目:${candidate.rolledValue ?? '-'} ${candidate.result || ''}</small></span><strong style="color:${candidate.type === 'expense' ? '#cbd5e1' : 'var(--accent-color)'};">${candidate.amount == null ? '金額入力' : `${candidate.type === 'expense' ? '-' : '+'}¥${candidate.amount.toLocaleString()}`}</strong></label>`).join('');
         const manualRows = (state.manualItems || []).map(item => `<div style="display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid rgba(255,255,255,.06);"><span style="flex:1;">${item.label}</span><strong>${item.type === 'expense' ? '-' : '+'}¥${Number(item.amount).toLocaleString()}</strong><button class="danger outline" data-action="remove-manual" data-session="${sessionId}" data-id="${item.id}">削除</button></div>`).join('');
         const quickRules = manualRules.map(rule => `<button class="outline" data-action="add-rule-manual" data-session="${sessionId}" data-rule="${rule.id}">${rule.icon || '✨'} ${rule.name} ${rule.amountMode === 'fixed' ? `+¥${rule.amount.toLocaleString()}` : '金額入力'}</button>`).join(' ');
-        return `<div class="card" style="margin-bottom:20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><h2 style="margin:0;">今回の貯金</h2><p style="color:#94a3b8;margin:4px 0;">${session?.title || 'セッション'}</p></div><div style="text-align:right;"><div data-review-total-label="${sessionId}" style="color:#94a3b8;">今回の貯金金額</div><strong data-review-total="${sessionId}" style="font-size:2em;color:var(--accent-color);">¥0</strong><div data-review-unpriced="${sessionId}" style="color:#fbbf24;min-height:1.2em;"></div></div></div><div style="margin-top:15px;border:1px solid var(--border-color);border-radius:10px;overflow:hidden;"><h3 style="padding:12px;margin:0;background:rgba(0,0,0,.2);">🎲 自動で見つかったもの</h3>${candidateRows || '<p style="padding:12px;color:#94a3b8;">自動候補はありません。</p>'}</div><div style="margin-top:15px;border:1px solid var(--border-color);border-radius:10px;overflow:hidden;"><h3 style="padding:12px;margin:0;background:rgba(0,0,0,.2);">＋ 手動イベント</h3>${manualRows || '<p style="padding:12px;color:#94a3b8;">手動追加はありません。</p>'}<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px;"><input data-manual-label="${sessionId}" placeholder="内容" style="flex:1;min-width:130px;"><input data-manual-amount="${sessionId}" type="number" min="0" placeholder="金額" style="width:100px;"><select data-manual-type="${sessionId}"><option value="saving">貯金</option><option value="expense">支出</option></select><button data-action="add-manual" data-session="${sessionId}">追加</button></div><div style="display:flex;gap:8px;flex-wrap:wrap;padding:0 12px 12px;">${quickRules}</div></div><div style="display:flex;gap:20px;justify-content:flex-end;padding-top:15px;color:#cbd5e1;">自動候補 <strong data-review-auto="${sessionId}">+¥0</strong>　手動追加 <strong data-review-manual="${sessionId}">+¥0</strong>　出費 <strong data-review-expense="${sessionId}">-¥0</strong></div><button style="width:100%;margin-top:15px;" data-action="confirm-review" data-session="${sessionId}">この内容で確定する</button></div>`;
+        return `<div class="card" data-review-session="${sessionId}" style="margin-bottom:20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><h2 style="margin:0;">今回の貯金</h2><p style="color:#94a3b8;margin:4px 0;">${session?.title || 'セッション'}</p></div><div style="text-align:right;"><div data-review-total-label="${sessionId}" style="color:#94a3b8;">今回の貯金金額</div><strong data-review-total="${sessionId}" style="font-size:2em;color:var(--accent-color);">¥0</strong><div data-review-unpriced="${sessionId}" style="color:#fbbf24;min-height:1.2em;"></div></div></div><div style="margin-top:15px;border:1px solid var(--border-color);border-radius:10px;overflow:hidden;"><h3 style="padding:12px;margin:0;background:rgba(0,0,0,.2);">🎲 自動で見つかったもの</h3>${candidateRows || '<p style="padding:12px;color:#94a3b8;">自動候補はありません。</p>'}</div><div style="margin-top:15px;border:1px solid var(--border-color);border-radius:10px;overflow:hidden;"><h3 style="padding:12px;margin:0;background:rgba(0,0,0,.2);">＋ 手動イベント</h3>${manualRows || '<p style="padding:12px;color:#94a3b8;">手動追加はありません。</p>'}<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px;"><input data-manual-label="${sessionId}" placeholder="内容" style="flex:1;min-width:130px;"><input data-manual-amount="${sessionId}" type="number" min="0" placeholder="金額" style="width:100px;"><select data-manual-type="${sessionId}"><option value="saving">貯金</option><option value="expense">支出</option></select><button data-action="add-manual" data-session="${sessionId}">追加</button></div><div style="display:flex;gap:8px;flex-wrap:wrap;padding:0 12px 12px;">${quickRules}</div></div><div style="display:flex;gap:20px;justify-content:flex-end;padding-top:15px;color:#cbd5e1;">自動候補 <strong data-review-auto="${sessionId}">+¥0</strong>　手動追加 <strong data-review-manual="${sessionId}">+¥0</strong>　出費 <strong data-review-expense="${sessionId}">-¥0</strong></div><button style="width:100%;margin-top:15px;" data-action="confirm-review" data-session="${sessionId}">この内容で確定する</button></div>`;
       }).join('');
       container.innerHTML = html || '<div class="card">未確認の貯金候補はありません。ログを取り込むか、設定からmanual ruleを追加してください。</div>';
       Object.keys(grouped).forEach(sessionId => phase3UpdateReviewTotal(sessionId));

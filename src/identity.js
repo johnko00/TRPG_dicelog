@@ -145,12 +145,10 @@
 
   function applyRollOverrides(rolls, overrides) {
     const bySourceKey = new Map((overrides || []).filter(item => item?.sourceKey).map(item => [item.sourceKey, item]));
-    return (rolls || []).map(roll => ({
-      ...roll,
-      override: bySourceKey.get(roll.sourceKey) || null,
-      analysisExcluded: Boolean(bySourceKey.get(roll.sourceKey)?.analysisExcluded),
-      savingsExcluded: Boolean(bySourceKey.get(roll.sourceKey)?.savingsExcluded)
-    }));
+    return (rolls || []).map(roll => {
+      const override = bySourceKey.get(roll.sourceKey) || null;
+      return { ...roll, override, analysisExcluded: override ? Boolean(override.analysisExcluded) : Boolean(roll.analysisExcluded), savingsExcluded: override ? Boolean(override.savingsExcluded) : Boolean(roll.savingsExcluded) };
+    });
   }
 
   return {
