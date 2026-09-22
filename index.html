@@ -166,11 +166,14 @@
         </div>
         <div id="calendar-container"></div>
       </div>
+      <div id="dashboard-pending-container"></div>
     </section>
     
     <!-- === TRPG貯金 === -->
     <section id="savings" class="hidden">
       <h1>TRPG貯金</h1>
+      <div id="savings-pending-summary" class="card" style="border:1px solid var(--accent-color); margin-bottom:20px;"></div>
+      <div id="savings-review-container"></div>
       
       <!-- 手動入力エリア -->
       <div class="card">
@@ -284,7 +287,7 @@
           <h3>自動貯金ルールの設定</h3><button id="btn-create-rule" class="outline">＋ 新規ルール</button>
         </div>
         <table style="width: 100%;">
-          <thead><tr><th>ルール名</th><th>金額</th><th>対象出目</th><th>対象結果</th><th>操作</th></tr></thead>
+          <thead><tr><th>ルール名</th><th>種類 / 金額</th><th>きっかけ</th><th>条件</th><th>操作</th></tr></thead>
           <tbody id="settings-rules-list"></tbody>
         </table>
       </div>
@@ -304,13 +307,14 @@
   <!-- Modals (省略せず保持) -->
   <div id="link-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h3>キャラクターの紐付け設定</h3><p style="color: #94a3b8;">対象: <strong id="link-target-name" style="color: #fff; font-size: 1.1em;"></strong></p><div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--accent-color);"><label style="display:block; margin-bottom: 8px; font-weight: bold; color: var(--accent-color);">担当PL (プレイヤー) を設定</label><select id="link-pc-pl" style="width: 100%;"><option value="">-- 変更しない / 未設定 --</option></select></div><div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;"><label style="display:block; margin-bottom: 8px; font-weight: bold;">それぞれ個別に新規PCとして登録</label><button id="btn-create-individual-link" style="width: 100%;">独立したPCとして登録</button></div><div style="text-align: center; margin: 10px 0; color: #94a3b8;">または</div><div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;"><label style="display:block; margin-bottom: 8px; font-weight: bold;">既存のPCに全てまとめる</label><div class="searchable-select" id="link-pc-dropdown"><input type="text" class="select-search" placeholder="PC名を入力・検索..." autocomplete="off"><input type="hidden" id="link-pc-id-value" class="select-value"><ul class="select-options hidden"></ul></div><button id="btn-save-link" style="width: 100%; margin-top: 10px;" class="outline">選択したPCにまとめる</button></div><div style="display: flex; justify-content: flex-end; margin-top: 20px;"><button class="outline" onclick="document.getElementById('link-modal-wrapper').classList.add('hidden')">キャンセル</button></div></div></div>
   <div id="pc-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>PC情報の編集</h2><p style="color: #94a3b8;">ログ上の名前: <strong id="edit-alias-name-display" style="color: #fff;"></strong></p><label style="display:block; margin-bottom:15px; color: var(--accent-color); font-weight: bold;">担当PL:<br><select id="edit-pc-pl" style="width: 100%; margin-top: 5px;"><option value="">-- 未設定 --</option></select></label><label style="display:block; margin-bottom:15px;">紐付け先PC:<br><div class="searchable-select" id="edit-pc-dropdown"><input type="text" class="select-search" placeholder="PC名を入力・検索..." autocomplete="off"><input type="hidden" id="edit-pc-id-value" class="select-value"><ul class="select-options hidden"></ul></div></label><label style="display:flex; align-items: center; gap: 10px; margin-bottom:20px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px;"><input type="checkbox" id="edit-pc-excluded"><span>自動貯金の対象から除外する（旧設定）</span></label><div style="display: flex; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 10px;"><button id="btn-unlink-pc" class="danger">紐付けを解除</button><button id="btn-delete-pc" class="danger outline">PCを削除</button><div style="display: flex; gap: 10px;"><button class="outline" onclick="document.getElementById('pc-edit-modal-wrapper').classList.add('hidden')">キャンセル</button><button id="btn-save-pc-info">保存</button></div></div></div></div>
-  <div id="rule-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>ルールの編集</h2><label style="display:block; margin-bottom:10px;">ルール名: <input type="text" id="edit-rule-name" style="width: calc(100% - 22px);"></label><label style="display:block; margin-bottom:10px;">金額(円): <input type="number" id="edit-rule-amount" style="width: calc(100% - 22px);"></label><label style="display:block; margin-bottom:10px;">出目(カンマ区切り): <input type="text" id="edit-rule-rolls" style="width: calc(100% - 22px);"></label><label style="display:block; margin-bottom:10px;">結果:<br><div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; margin-top: 5px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;"><label><input type="checkbox" class="rule-result-check" value="critical"> クリ</label><label><input type="checkbox" class="rule-result-check" value="fumble"> ファンブル</label><label><input type="checkbox" class="rule-result-check" value="special"> スペシャル</label><label><input type="checkbox" class="rule-result-check" value="success"> 成功</label></div></label><div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;"><button id="btn-save-rule">保存</button><button class="outline" onclick="document.getElementById('rule-edit-modal-wrapper').classList.add('hidden')">キャンセル</button></div></div></div>
+  <div id="rule-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>貯金ルールの編集</h2><label style="display:block; margin-bottom:10px;">ルール名: <input type="text" id="edit-rule-name" style="width: calc(100% - 22px);"></label><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><label>種類<select id="edit-rule-type"><option value="saving">貯金</option><option value="expense">支出</option></select></label><label>きっかけ<select id="edit-rule-trigger"><option value="roll">ダイス</option><option value="session">セッション</option><option value="manual">手動</option></select></label><label>金額方式<select id="edit-rule-amount-mode"><option value="fixed">固定金額</option><option value="input">都度入力</option></select></label><label>金額(円)<input type="number" id="edit-rule-amount" min="0"></label></div><label style="display:block; margin:10px 0;">誰の？<select id="edit-rule-scope"><option value="all">全員</option><option value="self">自分</option><option value="specific">指定character/PL</option></select></label><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;"><label>対象PL（複数可）<select id="edit-rule-pl-ids" multiple size="3"></select></label><label>対象character（複数可）<select id="edit-rule-pc-ids" multiple size="3"></select></label></div><label style="display:block; margin-bottom:10px;">立場（複数可）<br><label><input type="checkbox" class="rule-role-check" value="PC"> PC</label> <label><input type="checkbox" class="rule-role-check" value="KPC"> KPC</label> <label><input type="checkbox" class="rule-role-check" value="GM"> GM</label></label><label style="display:block; margin-bottom:10px;">出目（カンマ区切り）: <input type="text" id="edit-rule-rolls" style="width: calc(100% - 22px);"></label><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><label>最小値<input type="number" id="edit-rule-roll-min"></label><label>最大値<input type="number" id="edit-rule-roll-max"></label></div><label style="display:block; margin:10px 0;">結果:<br><div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;"><label><input type="checkbox" class="rule-result-check" value="critical"> クリ</label><label><input type="checkbox" class="rule-result-check" value="special"> スペシャル</label><label><input type="checkbox" class="rule-result-check" value="success"> 成功</label><label><input type="checkbox" class="rule-result-check" value="hard"> ハード</label><label><input type="checkbox" class="rule-result-check" value="extreme"> イクストリーム</label><label><input type="checkbox" class="rule-result-check" value="failure"> 失敗</label><label><input type="checkbox" class="rule-result-check" value="fumble"> ファンブル</label></div></label><label><input type="checkbox" id="edit-rule-judgement-only" checked> 判定rollのみ</label><div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;"><button id="btn-save-rule">保存</button><button class="outline" onclick="document.getElementById('rule-edit-modal-wrapper').classList.add('hidden')">キャンセル</button></div></div></div>
   <div id="session-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>セッション編集</h2><label style="display:block; margin-bottom:15px;">シナリオ名:<br><input type="text" id="edit-session-title" style="width: calc(100% - 22px); margin-top: 5px;"></label><label style="display:block; margin-bottom:15px;">セッション日:<br><input type="date" id="edit-session-date" style="width: calc(100% - 22px); margin-top: 5px;"></label><label style="display:block; margin-bottom:15px;">代表画像:<br><input type="file" id="edit-session-image" accept="image/*" style="width: calc(100% - 22px); margin-top: 5px;"></label><img id="edit-session-preview" style="max-width: 100%; max-height: 200px; display: none; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--border-color);" /><div style="display: flex; gap: 10px; justify-content: flex-end;"><button id="btn-save-session">保存</button><button class="outline" onclick="document.getElementById('session-edit-modal-wrapper').classList.add('hidden')">キャンセル</button></div></div></div>
   <div id="ledger-detail-modal-wrapper" class="modal-overlay hidden"><div class="modal large"><h2>履歴の詳細</h2><p style="color: #94a3b8; margin-bottom: 15px;" id="ledger-detail-info"></p><div id="ledger-detail-list" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; max-height: 400px; overflow-y: auto;"></div><div style="display: flex; justify-content: flex-end; margin-top: 20px;"><button class="outline" onclick="document.getElementById('ledger-detail-modal-wrapper').classList.add('hidden')">閉じる</button></div></div></div>
   <div id="calendar-detail-modal-wrapper" class="modal-overlay hidden"><div class="modal large"><h2 id="calendar-detail-date">日付詳細</h2><div id="calendar-detail-content" style="line-height:1.7;"></div><div style="display:flex; justify-content:flex-end; margin-top:20px;"><button class="outline" onclick="document.getElementById('calendar-detail-modal-wrapper').classList.add('hidden')">閉じる</button></div></div></div>
 
   <script src="src/identity.js"></script>
   <script src="src/parser.js"></script>
+  <script src="src/savings.js"></script>
   <script>
     // --- クイック入力設定 ---
     function setManualData(label, amount, type, icon) {
@@ -369,11 +373,11 @@
     // changing the existing store names or confirmed ledger records.
     const initDB = () => {
       return new Promise((resolve, reject) => {
-        const request = indexedDB.open('TRPGBankDB_v9', 3);
+        const request = indexedDB.open('TRPGBankDB_v9', 4);
         request.onupgradeneeded = (e) => {
           const database = e.target.result;
           const upgradeTx = e.target.transaction;
-          const storeNames = ['sessions', 'sourceLogs', 'rollRecords', 'ledgerEntries', 'parsedItems', 'statusChanges', 'aliasMappings', 'pcs', 'pls', 'savingsRules', 'sessionParticipants', 'rollOverrides'];
+          const storeNames = ['sessions', 'sourceLogs', 'rollRecords', 'ledgerEntries', 'parsedItems', 'statusChanges', 'aliasMappings', 'pcs', 'pls', 'savingsRules', 'sessionParticipants', 'rollOverrides', 'savingsCandidateDecisions'];
           const aliasExists = database.objectStoreNames.contains('aliasMappings');
           const aliasNeedsRekey = aliasExists && upgradeTx.objectStore('aliasMappings').keyPath !== 'id';
           const createAliasIndexes = store => {
@@ -410,6 +414,11 @@
                 store.createIndex('plId', 'plId', { unique: false });
               }
               if (name === 'rollOverrides') store.createIndex('sourceKey', 'sourceKey', { unique: true });
+              if (name === 'savingsCandidateDecisions') {
+                store.createIndex('candidateKey', 'candidateKey', { unique: false });
+                store.createIndex('sessionId', 'sessionId', { unique: false });
+                store.createIndex('ledgerEntryId', 'ledgerEntryId', { unique: false });
+              }
               if (name === 'aliasMappings') {
                 store.createIndex('rawSpeakerNormalized', 'rawSpeakerNormalized', { unique: false });
                 store.createIndex('scope', 'scope', { unique: false });
@@ -478,6 +487,25 @@
               cursor.continue();
             };
           }
+          if (database.objectStoreNames.contains('savingsRules')) {
+            const store = e.target.transaction.objectStore('savingsRules');
+            store.openCursor().onsuccess = event => {
+              const cursor = event.target.result;
+              if (!cursor) return;
+              const value = cursor.value;
+              const condition = value.condition || {};
+              value.type = value.type || 'saving';
+              value.amountMode = value.amountMode || 'fixed';
+              value.amount = Number(value.amount || 0);
+              value.icon = value.icon || (value.type === 'expense' ? '🛒' : '✨');
+              value.triggerType = value.triggerType || 'roll';
+              value.condition = { ...condition, results: condition.results || condition.result || null, result: undefined, judgementOnly: condition.judgementOnly == null ? value.triggerType === 'roll' : Boolean(condition.judgementOnly), targetScope: condition.targetScope || 'all', plIds: condition.plIds || null, pcIds: condition.pcIds || null, roles: condition.roles || null, myParticipation: condition.myParticipation || 'all' };
+              value.createdAt = value.createdAt || now;
+              value.updatedAt = value.updatedAt || now;
+              cursor.update(value);
+              cursor.continue();
+            };
+          }
           if (database.objectStoreNames.contains('aliasMappings') && !aliasNeedsRekey) {
             const store = e.target.transaction.objectStore('aliasMappings');
             createAliasIndexes(store);
@@ -498,10 +526,10 @@
           store.count().onsuccess = countEvent => {
             if (countEvent.target.result === 0) {
               const DEFAULT_RULES = [
-                { id: generateId(), name: '自分の1クリ', amount: 500, condition: { exactRolls: [1], result: ['critical'] }, isEnabled: true },
-                { id: generateId(), name: '自分の100F', amount: 500, condition: { exactRolls: [100], result: ['fumble'] }, isEnabled: true },
-                { id: generateId(), name: '自分のクリティカル', amount: 100, condition: { result: ['critical'] }, isEnabled: true },
-                { id: generateId(), name: '自分のファンブル', amount: 100, condition: { result: ['fumble'] }, isEnabled: true }
+                { id: generateId(), name: '自分の1クリ', type: 'saving', amountMode: 'fixed', amount: 500, icon: '☀', triggerType: 'roll', condition: { exactRolls: [1], results: ['critical'], judgementOnly: true, targetScope: 'self', myParticipation: 'self' }, isEnabled: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+                { id: generateId(), name: '自分の100F', type: 'saving', amountMode: 'fixed', amount: 500, icon: '⛈', triggerType: 'roll', condition: { exactRolls: [100], results: ['fumble'], judgementOnly: true, targetScope: 'self', myParticipation: 'self' }, isEnabled: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+                { id: generateId(), name: '自分のクリティカル', type: 'saving', amountMode: 'fixed', amount: 100, icon: '✨', triggerType: 'roll', condition: { results: ['critical'], judgementOnly: true, targetScope: 'self', myParticipation: 'self' }, isEnabled: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+                { id: generateId(), name: '自分のファンブル', type: 'saving', amountMode: 'fixed', amount: 100, icon: '💥', triggerType: 'roll', condition: { results: ['fumble'], judgementOnly: true, targetScope: 'self', myParticipation: 'self' }, isEnabled: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
               ];
               DEFAULT_RULES.forEach(r => store.add(r));
             }
@@ -992,7 +1020,7 @@
       return new Promise(resolve => {
         db.transaction(['savingsRules'], 'readonly').objectStore('savingsRules').getAll().onsuccess = e => {
           currentRules = e.target.result;
-          document.getElementById('settings-rules-list').innerHTML = currentRules.map(r => `<tr><td>${r.name}</td><td style="color:var(--success);">+${r.amount}円</td><td>${(r.condition.exactRolls && r.condition.exactRolls.length) ? r.condition.exactRolls.join(', ') : 'すべて'}</td><td>${(r.condition.result && r.condition.result.length) ? r.condition.result.join(', ') : '指定なし'}</td><td><button class="outline" onclick="openRuleEdit('${r.id}')" style="padding: 4px 8px; font-size: 0.85em;">編集</button> <button class="danger" onclick="deleteRule('${r.id}')" style="padding: 4px 8px; font-size: 0.85em;">削除</button></td></tr>`).join('');
+          document.getElementById('settings-rules-list').innerHTML = currentRules.map(raw => { const r = TRPGSavings.normalizeRule(raw); const amount = r.amountMode === 'input' ? '都度入力' : `${r.type === 'expense' ? '-' : '+'}¥${r.amount.toLocaleString()}`; return `<tr><td>${r.icon || ''} ${r.name}</td><td>${r.type === 'expense' ? '支出' : '貯金'} / ${amount}</td><td>${r.triggerType === 'roll' ? 'ダイス' : r.triggerType === 'session' ? 'セッション' : '手動'}</td><td>${r.condition.exactRolls?.length ? r.condition.exactRolls.join(', ') : r.condition.results?.join(', ') || 'すべて'}</td><td><button class="outline" onclick="openRuleEdit('${r.id}')" style="padding: 4px 8px; font-size: 0.85em;">編集</button> <button class="danger" onclick="deleteRule('${r.id}')" style="padding: 4px 8px; font-size: 0.85em;">削除</button></td></tr>`; }).join('');
           resolve();
         };
       });
@@ -1001,19 +1029,30 @@
     let editingRuleId = null;
     window.openRuleEdit = function(id) {
       editingRuleId = id; const r = currentRules.find(x => x.id === id);
-      document.getElementById('edit-rule-name').value = r ? r.name : ''; document.getElementById('edit-rule-amount').value = r ? r.amount : 500;
-      document.getElementById('edit-rule-rolls').value = (r && r.condition.exactRolls) ? r.condition.exactRolls.join(', ') : '';
+      const normalized = r ? TRPGSavings.normalizeRule(r) : TRPGSavings.normalizeRule({ id: null, name: '', amount: 500, type: 'saving', amountMode: 'fixed', triggerType: 'roll', condition: {} });
+      document.getElementById('edit-rule-name').value = normalized.name === '無名ルール' ? '' : normalized.name; document.getElementById('edit-rule-amount').value = normalized.amount;
+      document.getElementById('edit-rule-type').value = normalized.type; document.getElementById('edit-rule-trigger').value = normalized.triggerType; document.getElementById('edit-rule-amount-mode').value = normalized.amountMode;
+      document.getElementById('edit-rule-scope').value = normalized.condition.targetScope || 'all'; document.getElementById('edit-rule-rolls').value = normalized.condition.exactRolls?.join(', ') || '';
+      document.getElementById('edit-rule-roll-min').value = normalized.condition.rollMin ?? ''; document.getElementById('edit-rule-roll-max').value = normalized.condition.rollMax ?? '';
+      document.getElementById('edit-rule-judgement-only').checked = normalized.condition.judgementOnly;
+      const plSelect = document.getElementById('edit-rule-pl-ids'); const pcSelect = document.getElementById('edit-rule-pc-ids');
+      plSelect.innerHTML = (currentPlList || []).map(pl => `<option value="${pl.id}">${pl.name}</option>`).join('');
+      pcSelect.innerHTML = (currentPcList || []).map(pc => `<option value="${pc.id}">${pc.name}</option>`).join('');
+      Array.from(plSelect.options).forEach(option => { option.selected = (normalized.condition.plIds || []).includes(option.value); });
+      Array.from(pcSelect.options).forEach(option => { option.selected = (normalized.condition.pcIds || []).includes(option.value); });
       const checks = document.querySelectorAll('.rule-result-check'); checks.forEach(cb => cb.checked = false);
-      if (r && r.condition.result) checks.forEach(cb => { if (r.condition.result.includes(cb.value)) cb.checked = true; });
+      (normalized.condition.results || []).forEach(result => { const cb = document.querySelector(`.rule-result-check[value="${result}"]`); if (cb) cb.checked = true; });
+      document.querySelectorAll('.rule-role-check').forEach(cb => { cb.checked = (normalized.condition.roles || []).includes(cb.value); });
       document.getElementById('rule-edit-modal-wrapper').classList.remove('hidden');
     }
     document.getElementById('btn-create-rule').addEventListener('click', () => { openRuleEdit(null); });
     document.getElementById('btn-save-rule').addEventListener('click', () => {
-      const name = document.getElementById('edit-rule-name').value, amount = parseInt(document.getElementById('edit-rule-amount').value, 10) || 0;
+      const name = document.getElementById('edit-rule-name').value.trim(), amount = parseInt(document.getElementById('edit-rule-amount').value, 10) || 0;
       const rollsStr = document.getElementById('edit-rule-rolls').value.trim(), exactRolls = rollsStr ? rollsStr.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n)) : null;
       const results = Array.from(document.querySelectorAll('.rule-result-check:checked')).map(cb => cb.value);
       if (!name) return alert('ルール名を入力してください');
-      const rule = { id: editingRuleId || generateId(), name: name, amount: amount, isEnabled: true, condition: { exactRolls: (exactRolls && exactRolls.length > 0) ? exactRolls : null, result: results.length > 0 ? results : null } };
+      const now = new Date().toISOString();
+      const rule = { id: editingRuleId || generateId(), name, type: document.getElementById('edit-rule-type').value, amountMode: document.getElementById('edit-rule-amount-mode').value, amount, icon: document.getElementById('edit-rule-type').value === 'expense' ? '🛒' : '✨', triggerType: document.getElementById('edit-rule-trigger').value, condition: { exactRolls: exactRolls?.length ? exactRolls : null, rollMin: Number(document.getElementById('edit-rule-roll-min').value) || null, rollMax: Number(document.getElementById('edit-rule-roll-max').value) || null, results: results.length ? results : null, judgementOnly: document.getElementById('edit-rule-judgement-only').checked, targetScope: document.getElementById('edit-rule-scope').value, plIds: Array.from(document.getElementById('edit-rule-pl-ids').selectedOptions).map(option => option.value), pcIds: Array.from(document.getElementById('edit-rule-pc-ids').selectedOptions).map(option => option.value), roles: Array.from(document.querySelectorAll('.rule-role-check:checked')).map(cb => cb.value), myParticipation: document.getElementById('edit-rule-scope').value === 'self' ? 'self' : 'all' }, isEnabled: true, createdAt: currentRules.find(item => item.id === editingRuleId)?.createdAt || now, updatedAt: now };
       const tx = db.transaction(['savingsRules'], 'readwrite'); if (editingRuleId) tx.objectStore('savingsRules').put(rule); else tx.objectStore('savingsRules').add(rule);
       tx.oncomplete = () => { document.getElementById('rule-edit-modal-wrapper').classList.add('hidden'); loadSavingsRules(db); renderSavings(db); };
     });
@@ -1369,8 +1408,8 @@
       let html = '';
       entry.details.forEach(d => {
          html += `<div style="display:flex; justify-content:space-between; border-bottom:1px solid rgba(255,255,255,0.05); padding:15px 0;">
-             <div><strong>${d.ruleNameSnapshot || d.note}</strong><div style="font-size:0.85em; color:#94a3b8; margin-top:4px;">【${d.skill||'-'}】 目標:${d.targetValue||d.target||'-'} 出目:${d.rolledValue||d.roll||'-'} [${d.result||'-'}]</div></div>
-             <strong style="color:var(--success); font-size:1.1em;">+¥${d.amount}</strong></div>`;
+             <div><strong>${d.ruleNameSnapshot || d.note || d.label || '記録'}</strong><div style="font-size:0.85em; color:#94a3b8; margin-top:4px;">【${d.skillRaw||d.skill||'-'}】 目標:${d.targetValue||d.target||'-'} 出目:${d.rolledValue||d.roll||'-'} [${d.result||'-'}]</div></div>
+             <strong style="color:${entry.type === 'expense' ? '#cbd5e1' : 'var(--success)'}; font-size:1.1em;">${entry.type === 'expense' ? '-' : '+'}¥${d.amount}</strong></div>`;
       });
       document.getElementById('ledger-detail-info').textContent = `${entry.date} / ${entry.label} / 合計: +¥${entry.amount}`;
       document.getElementById('ledger-detail-list').innerHTML = html;
@@ -1380,6 +1419,195 @@
     window.deleteLedgerEntry = function(id) {
       if (!confirm('この履歴を取り消しますか？\n自動計算分だった場合、再び未確定の候補として表示されます。')) return;
       db.transaction(['ledgerEntries'], 'readwrite').objectStore('ledgerEntries').delete(id).transaction.oncomplete = () => { renderDashboardSummary(db); renderSavings(db); };
+    };
+
+    // --- Phase 3: candidate review and confirmed ledger snapshots ---
+    let phase3ReviewStates = {};
+    function phase3ReadSavingsData(database) {
+      return new Promise((resolve, reject) => {
+        const stores = ['rollRecords', 'pcs', 'pls', 'aliasMappings', 'sessions', 'sessionParticipants', 'rollOverrides', 'savingsRules', 'ledgerEntries', 'savingsCandidateDecisions'];
+        const tx = database.transaction(stores, 'readonly');
+        const data = {};
+        stores.forEach(name => tx.objectStore(name).getAll().onsuccess = e => { data[name] = e.target.result; });
+        tx.oncomplete = () => resolve(data);
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    function phase3CandidateData(data) {
+      const rules = (data.savingsRules || []).map(rule => TRPGSavings.normalizeRule(rule));
+      const rolls = TRPGIdentity.applyRollOverrides((data.rollRecords || []).filter(roll => roll.isJudgement || roll.sourceKey), data.rollOverrides || []);
+      const rollCandidates = TRPGSavings.generateRollCandidates({
+        rolls, rules, overrides: data.rollOverrides, mappings: data.aliasMappings, pcs: data.pcs, pls: data.pls,
+        sessionParticipants: data.sessionParticipants, myPlId
+      });
+      const sessionContexts = {};
+      (data.sessionParticipants || []).forEach(participant => {
+        const pc = (data.pcs || []).find(item => item.id === participant.pcId) || null;
+        const pl = (data.pls || []).find(item => item.id === participant.plId || item.id === pc?.plId) || null;
+        const context = { pcId: participant.pcId || null, pcName: pc?.name || null, plId: participant.plId || pc?.plId || null, plName: pl?.name || null, role: participant.role || null };
+        (sessionContexts[participant.sessionId] ||= []).push(context);
+      });
+      const sessionCandidates = TRPGSavings.generateSessionCandidates({ sessions: data.sessions, rules, myPlId, sessionContexts });
+      // Phase 2 ledger details used rollId/ruleId. Resolve those legacy
+      // details through the current stable sourceKey when possible so an
+      // upgrade never re-prompts an already confirmed roll.
+      const sourceKeyByRollId = new Map((data.rollRecords || []).map(roll => [roll.id, roll.sourceKey]));
+      const ledgerEntries = (data.ledgerEntries || []).map(entry => ({ ...entry, details: (entry.details || []).map(detail => detail.candidateKey || !detail.rollId || !sourceKeyByRollId.get(detail.rollId) ? detail : { ...detail, sourceKey: sourceKeyByRollId.get(detail.rollId) }) }));
+      return TRPGSavings.pendingCandidates([...rollCandidates, ...sessionCandidates], ledgerEntries, data.savingsCandidateDecisions);
+    }
+
+    function phase3RenderDashboardPending(pending, sessions) {
+      const target = document.getElementById('dashboard-pending-container');
+      const summary = document.getElementById('savings-pending-summary');
+      const pendingTotal = TRPGSavings.calculateReviewTotals((pending || []).map(candidate => ({ ...candidate, amount: candidate.amount || 0 })));
+      if (summary) summary.innerHTML = pending?.length ? `<strong>未確認候補 ${pending.length}件</strong>（合計 +¥${pendingTotal.net.toLocaleString()}）` : '未確認の貯金候補はありません。';
+      if (!target) return;
+      const bySession = {};
+      (pending || []).forEach(candidate => { if (!bySession[candidate.sessionId]) bySession[candidate.sessionId] = []; bySession[candidate.sessionId].push(candidate); });
+      const rows = Object.entries(bySession).map(([sessionId, candidates]) => {
+        const total = TRPGSavings.calculateReviewTotals(candidates).net;
+        const session = (sessions || []).find(item => item.id === sessionId);
+        return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:10px;"><div><strong>未確認の貯金があります</strong><div style="color:#94a3b8;">${session?.title || 'セッション'} / 候補${candidates.length}件</div></div><strong style="color:var(--accent-color);font-size:1.2em;">${total >= 0 ? '+' : ''}¥${total.toLocaleString()}</strong><button class="outline" onclick="document.querySelector('li[data-target=\'savings\']').click()">確認する</button></div>`;
+      }).join('');
+      target.innerHTML = rows || '';
+    }
+
+    function phase3StateItems(state) {
+      const selected = state.candidates.filter(candidate => state.selectedKeys.has(candidate.candidateKey));
+      return [...selected, ...(state.manualItems || [])];
+    }
+
+    function phase3UpdateReviewTotal(sessionId) {
+      const state = phase3ReviewStates[sessionId]; if (!state) return;
+      const automatic = state.candidates.filter(candidate => state.selectedKeys.has(candidate.candidateKey));
+      const manual = state.manualItems || [];
+      const autoTotals = TRPGSavings.calculateReviewTotals(automatic.map(candidate => ({ ...candidate, amount: candidate.amount || 0 })));
+      const manualTotals = TRPGSavings.calculateReviewTotals(manual);
+      const totals = TRPGSavings.calculateReviewTotals([...automatic.map(candidate => ({ ...candidate, amount: candidate.amount || 0 })), ...manual]);
+      const autoEl = document.querySelector(`[data-review-auto="${sessionId}"]`);
+      const manualEl = document.querySelector(`[data-review-manual="${sessionId}"]`);
+      const expenseEl = document.querySelector(`[data-review-expense="${sessionId}"]`);
+      const totalEl = document.querySelector(`[data-review-total="${sessionId}"]`);
+      if (autoEl) autoEl.textContent = `+¥${autoTotals.saving.toLocaleString()}`;
+      if (manualEl) manualEl.textContent = `+¥${manualTotals.saving.toLocaleString()}`;
+      if (expenseEl) expenseEl.textContent = `-¥${totals.expense.toLocaleString()}`;
+      if (totalEl) totalEl.textContent = `${totals.net >= 0 ? '+' : ''}¥${totals.net.toLocaleString()}`;
+    }
+
+    function phase3RenderReviews(pending, sessions, rules) {
+      const container = document.getElementById('savings-review-container');
+      const grouped = {};
+      (pending || []).forEach(candidate => { if (!grouped[candidate.sessionId]) grouped[candidate.sessionId] = []; grouped[candidate.sessionId].push(candidate); });
+      // Keep a review card for sessions without automatic candidates so that
+      // manual events can still be attached to a specific session.
+      (sessions || []).forEach(session => { if (session?.id && !grouped[session.id]) grouped[session.id] = []; });
+      Object.keys(phase3ReviewStates).forEach(sessionId => { if (!grouped[sessionId]) delete phase3ReviewStates[sessionId]; });
+      Object.entries(grouped).forEach(([sessionId, candidates]) => {
+        const prior = phase3ReviewStates[sessionId];
+        phase3ReviewStates[sessionId] = prior || { candidates, selectedKeys: new Set(candidates.map(candidate => candidate.candidateKey)), manualItems: [] };
+        phase3ReviewStates[sessionId].candidates = candidates;
+        phase3ReviewStates[sessionId].manualRules = (rules || []).filter(rule => rule.triggerType === 'manual' && rule.isEnabled);
+      });
+      const html = Object.entries(grouped).map(([sessionId, candidates]) => {
+        const state = phase3ReviewStates[sessionId];
+        const session = (sessions || []).find(item => item.id === sessionId);
+        const manualRules = (rules || []).filter(rule => rule.triggerType === 'manual' && rule.isEnabled);
+        const candidateRows = candidates.map(candidate => `<label style="display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid rgba(255,255,255,.06);"><input type="checkbox" data-review-candidate="${candidate.candidateKey}" data-session="${sessionId}" ${state.selectedKeys.has(candidate.candidateKey) ? 'checked' : ''}><span style="flex:1;"><strong>${candidate.ruleNameSnapshot}</strong><br><small style="color:#94a3b8;">${candidate.pcNameSnapshot || '対象character未設定'} / ${candidate.role || 'role未設定'} 【${candidate.skillRaw || 'session trigger'}】 出目:${candidate.rolledValue ?? '-'} ${candidate.result || ''}</small></span><strong style="color:${candidate.type === 'expense' ? '#cbd5e1' : 'var(--accent-color)'};">${candidate.amount == null ? '金額入力' : `${candidate.type === 'expense' ? '-' : '+'}¥${candidate.amount.toLocaleString()}`}</strong></label>`).join('');
+        const manualRows = (state.manualItems || []).map(item => `<div style="display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid rgba(255,255,255,.06);"><span style="flex:1;">${item.label}</span><strong>${item.type === 'expense' ? '-' : '+'}¥${Number(item.amount).toLocaleString()}</strong><button class="danger outline" data-action="remove-manual" data-session="${sessionId}" data-id="${item.id}">削除</button></div>`).join('');
+        const quickRules = manualRules.map(rule => `<button class="outline" data-action="add-rule-manual" data-session="${sessionId}" data-rule="${rule.id}">${rule.icon || '✨'} ${rule.name} ${rule.amountMode === 'fixed' ? `+¥${rule.amount.toLocaleString()}` : '金額入力'}</button>`).join(' ');
+        return `<div class="card" style="margin-bottom:20px;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><h2 style="margin:0;">今回の貯金</h2><p style="color:#94a3b8;margin:4px 0;">${session?.title || 'セッション'}</p></div><div style="text-align:right;"><div style="color:#94a3b8;">今回の貯金金額</div><strong data-review-total="${sessionId}" style="font-size:2em;color:var(--accent-color);">¥0</strong></div></div><div style="margin-top:15px;border:1px solid var(--border-color);border-radius:10px;overflow:hidden;"><h3 style="padding:12px;margin:0;background:rgba(0,0,0,.2);">🎲 自動で見つかったもの</h3>${candidateRows || '<p style="padding:12px;color:#94a3b8;">自動候補はありません。</p>'}</div><div style="margin-top:15px;border:1px solid var(--border-color);border-radius:10px;overflow:hidden;"><h3 style="padding:12px;margin:0;background:rgba(0,0,0,.2);">＋ 手動イベント</h3>${manualRows || '<p style="padding:12px;color:#94a3b8;">手動追加はありません。</p>'}<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px;"><input data-manual-label="${sessionId}" placeholder="内容" style="flex:1;min-width:130px;"><input data-manual-amount="${sessionId}" type="number" min="0" placeholder="金額" style="width:100px;"><select data-manual-type="${sessionId}"><option value="saving">貯金</option><option value="expense">支出</option></select><button data-action="add-manual" data-session="${sessionId}">追加</button></div><div style="display:flex;gap:8px;flex-wrap:wrap;padding:0 12px 12px;">${quickRules}</div></div><div style="display:flex;gap:20px;justify-content:flex-end;padding-top:15px;color:#cbd5e1;">自動候補 <strong data-review-auto="${sessionId}">+¥0</strong>　手動追加 <strong data-review-manual="${sessionId}">+¥0</strong>　出費 <strong data-review-expense="${sessionId}">-¥0</strong></div><button style="width:100%;margin-top:15px;" data-action="confirm-review" data-session="${sessionId}">この内容で確定する</button></div>`;
+      }).join('');
+      container.innerHTML = html || '<div class="card">未確認の貯金候補はありません。ログを取り込むか、設定からmanual ruleを追加してください。</div>';
+      Object.keys(grouped).forEach(sessionId => phase3UpdateReviewTotal(sessionId));
+      phase3RenderDashboardPending(pending, sessions);
+    }
+
+    async function renderSavings(db) {
+      try {
+        const data = await phase3ReadSavingsData(db);
+        window._currentLedgers = data.ledgerEntries || [];
+        const rules = (data.savingsRules || []).map(rule => TRPGSavings.normalizeRule(rule));
+        const allCandidates = phase3CandidateData(data);
+        phase3RenderReviews(allCandidates, data.sessions, rules);
+        const history = document.getElementById('savings-history-container');
+        const entries = [...(data.ledgerEntries || [])].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 50);
+        history.innerHTML = entries.length ? `<div class="history-list">${entries.map(entry => `<div class="history-item"><div class="hist-icon-wrap ${entry.type === 'expense' ? 'expense' : ''}">${entry.type === 'expense' ? '🛒' : '🐖'}</div><div class="hist-info"><div class="hist-title">${entry.label || '記録'}</div><div class="hist-sub">${entry.date}</div></div><div class="hist-right"><div class="hist-amount ${entry.type === 'expense' ? 'minus' : 'plus'}">${entry.type === 'expense' ? '-' : '+'}¥${Number(entry.amount).toLocaleString()}</div><button class="outline" onclick="openLedgerDetail('${entry.id}')">詳細</button><button class="danger" onclick="deleteLedgerEntry('${entry.id}')">取消</button></div></div>`).join('')}</div>` : '<p style="color:#94a3b8;">履歴はまだありません。</p>';
+      } catch (error) { document.getElementById('savings-review-container').innerHTML = `<div class="card">貯金候補の読み込みに失敗しました: ${error.message}</div>`; }
+    }
+
+    async function phase3AddManual(sessionId, item) {
+      if (!phase3ReviewStates[sessionId]) return;
+      phase3ReviewStates[sessionId].manualItems.push({ id: generateId(), sessionId, candidateKey: null, label: item.label, amount: Number(item.amount) || 0, type: item.type || 'saving', ruleId: item.ruleId || null, ruleNameSnapshot: item.ruleNameSnapshot || item.label, createdAt: new Date().toISOString() });
+      await renderSavings(db);
+    }
+
+    async function phase3ConfirmSession(sessionId) {
+      const state = phase3ReviewStates[sessionId]; if (!state) return;
+      const selected = state.candidates.filter(candidate => state.selectedKeys.has(candidate.candidateKey));
+      const resolvedSelected = [];
+      for (const candidate of selected) {
+        let amount = candidate.amount;
+        if (amount == null) { const entered = prompt(`「${candidate.ruleNameSnapshot}」の金額を入力してください`, '0'); if (entered === null) return; amount = Number(entered); }
+        if (!Number.isFinite(amount) || amount < 0) return alert('金額が不正です。');
+        resolvedSelected.push({ ...candidate, amount });
+      }
+      const items = [...resolvedSelected, ...(state.manualItems || [])];
+      const totals = TRPGSavings.calculateReviewTotals(items);
+      if (!items.length && !state.candidates.length) return alert('候補または手動イベントを1件以上選択してください。');
+      if (!confirm(`今回の貯金金額 ${totals.net >= 0 ? '+' : ''}¥${totals.net.toLocaleString()}\n自動候補 ${resolvedSelected.length}件 / 手動追加 ${(state.manualItems || []).length}件\nこの内容で確定しますか？`)) return;
+      const now = new Date().toISOString();
+      const savingItems = items.filter(item => item.type !== 'expense').map(TRPGSavings.buildLedgerSnapshot);
+      const expenseItems = items.filter(item => item.type === 'expense').map(TRPGSavings.buildLedgerSnapshot);
+      const ledgerEntries = [];
+      if (savingItems.length) ledgerEntries.push({ id: generateId(), sessionId, date: now.split('T')[0], type: 'saving', amount: savingItems.reduce((sum, item) => sum + Number(item.amount || 0), 0), label: 'TRPG貯金', details: savingItems, createdAt: now });
+      if (expenseItems.length) ledgerEntries.push({ id: generateId(), sessionId, date: now.split('T')[0], type: 'expense', amount: expenseItems.reduce((sum, item) => sum + Number(item.amount || 0), 0), label: 'TRPG関連支出', details: expenseItems, createdAt: now });
+      const acceptedLedgerId = new Map();
+      ledgerEntries.forEach(entry => entry.details.forEach(detail => { if (detail.candidateKey) acceptedLedgerId.set(detail.candidateKey, entry.id); }));
+      const decisions = state.candidates.map(candidate => ({ id: generateId(), candidateKey: candidate.candidateKey, sessionId, decision: state.selectedKeys.has(candidate.candidateKey) ? 'accepted' : 'dismissed', ledgerEntryId: acceptedLedgerId.get(candidate.candidateKey) || null, decidedAt: now }));
+      const tx = db.transaction(['ledgerEntries', 'savingsCandidateDecisions'], 'readwrite');
+      ledgerEntries.forEach(entry => tx.objectStore('ledgerEntries').add(entry)); decisions.forEach(decision => tx.objectStore('savingsCandidateDecisions').add(decision));
+      tx.oncomplete = () => { delete phase3ReviewStates[sessionId]; renderDashboardSummary(db); renderSavings(db); };
+    }
+
+    const phase3ReviewContainer = document.getElementById('savings-review-container');
+    phase3ReviewContainer.addEventListener('change', event => {
+      const checkbox = event.target.closest('[data-review-candidate]'); if (!checkbox) return;
+      const state = phase3ReviewStates[checkbox.dataset.session]; if (!state) return;
+      if (checkbox.checked) state.selectedKeys.add(checkbox.dataset.reviewCandidate); else state.selectedKeys.delete(checkbox.dataset.reviewCandidate);
+      phase3UpdateReviewTotal(checkbox.dataset.session);
+    });
+    phase3ReviewContainer.addEventListener('click', async event => {
+      const button = event.target.closest('[data-action]'); if (!button) return;
+      const sessionId = button.dataset.session; const state = phase3ReviewStates[sessionId]; if (!state) return;
+      if (button.dataset.action === 'add-manual') {
+        const label = document.querySelector(`[data-manual-label="${sessionId}"]`).value.trim(); const amount = document.querySelector(`[data-manual-amount="${sessionId}"]`).value; const type = document.querySelector(`[data-manual-type="${sessionId}"]`).value;
+        if (!label || amount === '') return alert('内容と金額を入力してください。');
+        await phase3AddManual(sessionId, { label, amount, type });
+      } else if (button.dataset.action === 'add-rule-manual') {
+        const rule = (state.manualRules || []).find(item => item.id === button.dataset.rule);
+        const amount = rule?.amountMode === 'input' ? prompt('金額を入力してください', '0') : rule?.amount;
+        if (amount == null) return;
+        await phase3AddManual(sessionId, { label: rule.name, amount, type: rule.type, ruleId: rule.id, ruleNameSnapshot: rule.name });
+      } else if (button.dataset.action === 'remove-manual') {
+        state.manualItems = state.manualItems.filter(item => item.id !== button.dataset.id); await renderSavings(db);
+      } else if (button.dataset.action === 'confirm-review') await phase3ConfirmSession(sessionId);
+    });
+
+    window.deleteLedgerEntry = function(id) {
+      if (!confirm('この履歴を取り消しますか？\n採用済みcandidateは再び確認候補に戻ります。')) return;
+      const readTx = db.transaction(['ledgerEntries'], 'readonly');
+      readTx.objectStore('ledgerEntries').get(id).onsuccess = event => {
+        const entry = event.target.result;
+        const candidateKeys = (entry?.details || []).map(detail => detail.candidateKey).filter(Boolean);
+        const tx = db.transaction(['ledgerEntries', 'savingsCandidateDecisions'], 'readwrite');
+        tx.objectStore('ledgerEntries').delete(id);
+        const decisionStore = tx.objectStore('savingsCandidateDecisions');
+        candidateKeys.forEach(candidateKey => decisionStore.index('candidateKey').getAll(candidateKey).onsuccess = decisionEvent => {
+          (decisionEvent.target.result || []).filter(decision => decision.decision === 'accepted' && decision.ledgerEntryId === id).forEach(decision => decisionStore.delete(decision.id));
+        });
+        tx.oncomplete = () => { renderDashboardSummary(db); renderSavings(db); };
+      };
     };
 
     // --- Navigation & Core Events ---
