@@ -178,6 +178,16 @@
     .analysis-compare-bar-track { display:grid; gap:3px; }
     .analysis-compare-bar-track span { display:block; height:8px; border-radius:99px; background:linear-gradient(90deg,#fb7185,#c026d3); }
     .analysis-compare-bar-track span:last-child { background:linear-gradient(90deg,#60a5fa,#22d3ee); }
+    .analysis-subtabs { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 16px; }
+    .analysis-subtab { border:1px solid rgba(255,255,255,.14); background:rgba(0,0,0,.18); color:#cbd5e1; border-radius:999px; padding:8px 14px; cursor:pointer; }
+    .analysis-subtab[aria-selected="true"] { background:rgba(255,117,140,.2); border-color:rgba(255,117,140,.7); color:#fff; }
+    .incident-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
+    .incident-card { border:1px solid rgba(255,255,255,.1); background:rgba(0,0,0,.2); border-radius:14px; padding:14px; min-width:0; }
+    .incident-tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+    .incident-tag { border-radius:999px; padding:4px 8px; background:rgba(251,113,133,.15); color:#fecdd3; font-size:.78rem; }
+    .incident-meta { color:#94a3b8; font-size:.82rem; line-height:1.5; }
+    .incident-evidence { color:#cbd5e1; font-size:.84rem; margin-top:8px; }
+    .incident-session-title { color:#fff; margin:18px 0 8px; }
     @media (max-width: 700px) { .analysis-bar-chart { gap:3px; } .analysis-bar-label { font-size:.6rem; } .analysis-comparison-grid { grid-template-columns:1fr; } .analysis-compare-metric { grid-template-columns:1fr repeat(3,minmax(58px,1fr)); font-size:.82rem; } }
     .play-group-color { width:1.1em; height:1.1em; border-radius:50%; display:inline-block; vertical-align:-.15em; margin-right:5px; border:1px solid rgba(255,255,255,.35); }
 
@@ -336,6 +346,10 @@
     
     <section id="analysis" class="hidden">
       <h1>分析・グラフ</h1>
+      <div id="analysis-subtabs" class="analysis-subtabs" role="tablist" aria-label="分析表示">
+        <button type="button" class="analysis-subtab" data-analysis-view="analysis" aria-selected="true">分析</button>
+        <button type="button" class="analysis-subtab" data-analysis-view="incidents" aria-selected="false">📖 事件簿</button>
+      </div>
       <div id="analysis-filter-container"></div>
       <div id="analysis-content"></div>
     </section>
@@ -392,6 +406,7 @@
   <script src="src/parser.js"></script>
   <script src="src/savings.js"></script>
   <script src="src/dashboard.js"></script>
+  <script src="src/incidents.js"></script>
   <script src="src/analysis.js"></script>
   <script>
     // --- クイック入力設定 ---
@@ -1342,6 +1357,8 @@
     let analysisFilterState = TRPGAnalysis.normalizeAnalysisFilter();
     let analysisComparisonState = { enabled: false, dimension: 'role', a: 'PC', b: 'KPC', periodAFrom: null, periodATo: null, periodBFrom: null, periodBTo: null };
     let analysisSkillSortState = { sortBy: 'usageCount', minimumSampleSize: 5, openSkillKey: null };
+    let analysisViewState = 'analysis';
+    let incidentDisplayState = { category: 'all', severity: 'all', sort: 'newest' };
     const analysisFilterLabels = { plIds: 'PL', pcIds: 'PC', sessionIds: 'シナリオ', playGroupIds: 'グループ', roles: 'role', systems: 'system', skills: '技能', skillCategories: '技能カテゴリ' };
 
     function phase5ReadAnalysisData(database) {
@@ -1538,10 +1555,43 @@
       return '<div class="card"><div class="analysis-section-title"><h2>比較分析</h2><label style="color:#cbd5e1;font-size:.85rem;"><input id="analysis-compare-enabled" type="checkbox" checked> 比較する</label></div>' + controls + warning + '<div style="margin-top:14px;">' + metricRows + phase5ComparisonBars(a, b) + '</div></div>';
     }
 
+    function phase5IncidentValue(value) { return value == null || value === '' ? '-' : phase4Escape(String(value)); }
+    function phase5RenderIncidentCard(group) {
+      const incident = group.representative || group.incidents[0] || {};
+      const tags = (group.tags || [incident.title]).map(tag => '<span class="incident-tag">' + phase4Escape(tag) + '</span>').join('');
+      const evidence = incident.evidence || {};
+      const target = incident.targetValue == null ? '' : '目標 ' + phase5IncidentValue(incident.targetValue);
+      const rolled = incident.rolledValue == null ? '' : '出目 ' + phase5IncidentValue(incident.rolledValue);
+      const result = incident.result ? '結果 ' + phase5IncidentValue(incident.result) : '';
+      const skill = incident.skillDisplayName ? '技能 ' + phase5IncidentValue(incident.skillDisplayName) : '';
+      const status = incident.statusChangeIds?.length ? 'status ' + incident.statusChangeIds.length + '件' : '';
+      const evidenceText = Object.entries(evidence).filter(([key]) => key !== 'sourceRollKeys').map(([key, value]) => key + ': ' + value).join(' / ');
+      return '<article class="incident-card" tabindex="0"><div class="incident-tags">' + tags + '</div><strong>' + phase4Escape(group.title || incident.title || '事件') + '</strong><div class="incident-meta">' + phase5IncidentValue(incident.sessionTitle || incident.sessionId) + (incident.sessionDate ? ' / ' + phase5IncidentValue(incident.sessionDate) : '') + '</div><div class="incident-meta">' + [incident.pcId ? 'PC ' + phase5IncidentValue(incident.pcId) : '', incident.role ? 'role ' + phase5IncidentValue(incident.role) : '', skill, target, rolled, result, status].filter(Boolean).join(' · ') + '</div>' + (evidenceText ? '<div class="incident-evidence">' + phase4Escape(evidenceText) + '</div>' : '') + '</article>';
+    }
+    function phase5RenderIncidents(context) {
+      const target = document.getElementById('analysis-content');
+      const filtered = TRPGAnalysis.applyAnalysisFilter(context, analysisFilterState);
+      const incidents = TRPGAnalysis.detectIncidents(filtered, {});
+      const visible = TRPGAnalysis.filterIncidents(incidents, incidentDisplayState);
+      const sorted = TRPGAnalysis.sortIncidents(visible, incidentDisplayState.sort, filtered);
+      const groups = TRPGAnalysis.groupIncidents(sorted);
+      const summary = TRPGAnalysis.calculateIncidentSummary(visible);
+      const sessions = new Map();
+      groups.forEach(group => { const id = group.representative.sessionId || '__unknown__'; if (!sessions.has(id)) sessions.set(id, []); sessions.get(id).push(group); });
+      const sessionBlocks = [...sessions.entries()].map(([id, cards]) => {
+        const incident = cards[0].representative || {};
+        return '<section><h3 class="incident-session-title">' + phase5IncidentValue(incident.sessionDate || '日付なし') + ' ' + phase5IncidentValue(incident.sessionTitle || id) + '</h3><div class="incident-grid">' + cards.map(phase5RenderIncidentCard).join('') + '</div></section>';
+      }).join('');
+      const controls = '<div class="analysis-filter-actions"><label>事件カテゴリ <select id="incident-category"><option value="all"' + (incidentDisplayState.category === 'all' ? ' selected' : '') + '>すべて</option><option value="roll"' + (incidentDisplayState.category === 'roll' ? ' selected' : '') + '>ダイス</option><option value="margin"' + (incidentDisplayState.category === 'margin' ? ' selected' : '') + '>ギリギリ</option><option value="sequence"' + (incidentDisplayState.category === 'sequence' ? ' selected' : '') + '>連続</option><option value="skill"' + (incidentDisplayState.category === 'skill' ? ' selected' : '') + '>技能</option><option value="status"' + (incidentDisplayState.category === 'status' ? ' selected' : '') + '>SAN / HP</option></select></label><label>重要度 <select id="incident-severity"><option value="all"' + (incidentDisplayState.severity === 'all' ? ' selected' : '') + '>すべて</option><option value="normal"' + (incidentDisplayState.severity === 'normal' ? ' selected' : '') + '>normal</option><option value="notable"' + (incidentDisplayState.severity === 'notable' ? ' selected' : '') + '>notable</option><option value="rare"' + (incidentDisplayState.severity === 'rare' ? ' selected' : '') + '>rare</option></select></label><label>並び順 <select id="incident-sort"><option value="newest"' + (incidentDisplayState.sort === 'newest' ? ' selected' : '') + '>新しい卓順</option><option value="oldest"' + (incidentDisplayState.sort === 'oldest' ? ' selected' : '') + '>古い卓順</option><option value="most"' + (incidentDisplayState.sort === 'most' ? ' selected' : '') + '>事件の多い卓順</option></select></label></div>';
+      const summaryCards = '<div class="analysis-stats-grid">' + phase5MetricCard('事件数', summary.totalIncidentCount) + phase5MetricCard('Critical', summary.criticalCount) + phase5MetricCard('Fumble', summary.fumbleCount) + phase5MetricCard('出目1', summary.exact1Count) + phase5MetricCard('出目100', summary.exact100Count) + phase5MetricCard('最長成功連続', summary.successStreakMax || '-') + phase5MetricCard('最長失敗連続', summary.failureStreakMax || '-') + '</div>';
+      target.innerHTML = '<div class="card"><div class="analysis-section-title"><h2>📖 ダイス事件簿</h2><small>元データから毎回再計算する派生分析</small></div>' + summaryCards + controls + '</div>' + (sessionBlocks || '<div class="card dashboard-empty">条件に一致する事件はありません。</div>');
+    }
+
     function phase5RenderBasicStats(context) {
       const target = document.getElementById('analysis-content');
       if (!target) return;
       if (!context.rawRolls.length && !context.sessions.length) { target.innerHTML = '<div class="card dashboard-empty">まだ分析できるログがありません。</div>'; return; }
+      if (analysisViewState === 'incidents') { phase5RenderIncidents(context); return; }
       const filtered = TRPGAnalysis.applyAnalysisFilter(context, analysisFilterState);
       if (!filtered.sessions.length && !filtered.resolvedRolls.length) {
         const countLabel = document.getElementById('analysis-filter-count');
@@ -1568,16 +1618,28 @@
           if (id === 'analysis-compare-a-to') analysisComparisonState.periodATo = event.target.value || null;
           if (id === 'analysis-compare-b-from') analysisComparisonState.periodBFrom = event.target.value || null;
           if (id === 'analysis-compare-b-to') analysisComparisonState.periodBTo = event.target.value || null;
+          if (id === 'incident-category') incidentDisplayState.category = event.target.value;
+          if (id === 'incident-severity') incidentDisplayState.severity = event.target.value;
+          if (id === 'incident-sort') incidentDisplayState.sort = event.target.value;
           if (id.startsWith('analysis-')) phase5RenderFilteredAnalysis();
+          if (id.startsWith('incident-')) phase5RenderFilteredAnalysis();
         });
       }
     }
           
     function phase5RenderFilteredAnalysis() {
       if (!analysisContextCache) return;
+      document.querySelectorAll('[data-analysis-view]').forEach(tab => tab.setAttribute('aria-selected', tab.dataset.analysisView === analysisViewState ? 'true' : 'false'));
       phase5RenderFilterBar(analysisContextCache);
       phase5RenderBasicStats(analysisContextCache);
     }
+
+    document.getElementById('analysis-subtabs')?.addEventListener('click', event => {
+      const button = event.target.closest('[data-analysis-view]');
+      if (!button) return;
+      analysisViewState = button.dataset.analysisView || 'analysis';
+      phase5RenderFilteredAnalysis();
+    });
 
     async function renderOverallAnalysis(database) {
       try {

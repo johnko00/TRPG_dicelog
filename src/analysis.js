@@ -1,8 +1,8 @@
 /* Pure analysis context, filter, dimension, and module helpers. */
 (function (root, factory) {
-  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./identity.js'));
-  else root.TRPGAnalysis = factory(root.TRPGIdentity);
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (identity) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory(require('./identity.js'), require('./incidents.js'));
+  else root.TRPGAnalysis = factory(root.TRPGIdentity, root.TRPGIncidents);
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (identity, incidents) {
   const UNGROUPED = '__ungrouped__';
   const PLAY_GROUP_STORES = ['playGroups', 'sessionPlayGroups'];
   const SUCCESS_RESULTS = ['critical', 'special', 'success', 'hard', 'extreme', 'hardSuccess', 'extremeSuccess'];
@@ -198,6 +198,7 @@
     const statuses = source.statusChanges.filter(status => visibleSessionIds.has(status.sessionId));
     return {
       ...source,
+      analysisSource: source,
       filter,
       sessions,
       rolls: resolvedRolls.map(roll => ({ ...roll })),
@@ -620,6 +621,9 @@
   registerAnalysisModule({ id: 'distribution', title: '出目分布', description: 'numericな判定出目のbucket分布', requiredData: ['rolls'], minimumSampleSize: 1, calculate: calculateRollDistribution });
   registerAnalysisModule({ id: 'skills', title: '技能分析', description: '技能ごとの判定統計', requiredData: ['rolls'], minimumSampleSize: 1, calculate: calculateSkillStats });
   registerAnalysisModule({ id: 'breakdown', title: '内訳', description: 'PL/PC/session/group/role/system別統計', requiredData: ['rolls', 'sessions'], minimumSampleSize: 1, calculate: (context, options) => calculateBreakdown(context, options?.dimension || 'session', options) });
+  if (incidents) {
+    registerAnalysisModule({ id: 'incidents', title: '事件簿', description: '元ログから再計算するダイス事件', requiredData: ['rolls', 'statusChanges', 'sessions'], minimumSampleSize: 0, calculate: (context, options) => incidents.detectIncidents(context, options) });
+  }
 
   return {
     UNGROUPED, PLAY_GROUP_STORES, SUCCESS_RESULTS, FAILURE_RESULTS, ROLES,
@@ -631,6 +635,20 @@
     createPlayGroupRecord, createSessionPlayGroupRecord,
     dedupeSessionPlayGroups, removePlayGroupRelations, getAnalysisMigrationPlan,
     registerAnalysisModule, getAnalysisModule, listAnalysisModules, calculateAnalysisModule,
+    detectIncidents: incidents?.detectIncidents,
+    registerIncidentDetector: incidents?.registerIncidentDetector,
+    getIncidentDetector: incidents?.getIncidentDetector,
+    listIncidentDetectors: incidents?.listIncidentDetectors,
+    filterIncidents: incidents?.filterIncidents,
+    sortIncidents: incidents?.sortIncidents,
+    groupIncidents: incidents?.groupIncidents,
+    calculateIncidentSummary: incidents?.calculateIncidentSummary,
+    calculateLongestStreaks: incidents?.calculateLongestStreaks,
+    calculateMaxStatusDrops: incidents?.calculateMaxStatusDrops,
+    calculateSessionIncidentSummary: incidents?.calculateSessionIncidentSummary,
+    countInvalidSourceReferences: incidents?.countInvalidSourceReferences,
+    DEFAULT_INCIDENT_OPTIONS: incidents?.DEFAULT_INCIDENT_OPTIONS,
+    INCIDENT_CATEGORIES: incidents?.INCIDENT_CATEGORIES,
     registerFilterPredicate, listFilterPredicates
   };
 });
