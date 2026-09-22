@@ -145,6 +145,19 @@
     .dashboard-event-meta { color:#94a3b8; font-size:.84rem; margin-top:5px; }
     .dashboard-session-image { width:48px; height:48px; border-radius:12px; object-fit:cover; float:right; border:1px solid rgba(255,255,255,.2); }
     @media (max-width: 800px) { .dashboard-stat-grid { grid-template-columns: repeat(2, 1fr); } .calendar-grid { gap:5px; } .dashboard-calendar-day { min-height:95px; padding:6px; } .dashboard-session-card { font-size:.68rem; padding:4px; } }
+    /* === Phase 5A-1 analysis foundation === */
+    .analysis-filter-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+    .analysis-filter-field { display:flex; flex-direction:column; gap:6px; color:#cbd5e1; font-size:.85rem; }
+    .analysis-filter-field select { min-height:44px; }
+    .analysis-filter-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; }
+    .analysis-filter-chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+    .analysis-filter-chip { display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(255,117,140,.45); color:#fda4af; background:rgba(255,117,140,.12); border-radius:999px; padding:5px 10px; font-size:.8rem; }
+    .analysis-filter-chip button { padding:0; background:none; box-shadow:none; color:#fda4af; font-size:.9rem; }
+    .analysis-stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:12px; }
+    .analysis-stat-card { background:rgba(0,0,0,.18); border-radius:14px; padding:14px; border:1px solid rgba(255,255,255,.06); }
+    .analysis-stat-card small { display:block; color:#94a3b8; }
+    .analysis-stat-card strong { display:block; color:#fff; font-size:1.55rem; margin-top:4px; }
+    .play-group-color { width:1.1em; height:1.1em; border-radius:50%; display:inline-block; vertical-align:-.15em; margin-right:5px; border:1px solid rgba(255,255,255,.35); }
 
   </style>
 </head>
@@ -301,6 +314,7 @@
     
     <section id="analysis" class="hidden">
       <h1>分析・グラフ</h1>
+      <div id="analysis-filter-container"></div>
       <div id="analysis-content"></div>
     </section>
     
@@ -332,14 +346,23 @@
           <thead><tr><th>PL名</th><th>操作</th></tr></thead><tbody id="settings-pl-list"></tbody>
         </table>
       </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+          <div><h3 style="margin-bottom:4px;">プレイグループ管理</h3><small style="color:#94a3b8;">分析用の整理軸です。セッションや貯金記録は削除されません。</small></div>
+          <button id="btn-create-play-group" class="outline">＋ 新規グループ</button>
+        </div>
+        <div id="play-group-empty" class="dashboard-empty hidden">プレイグループはまだ登録されていません。</div>
+        <table><thead><tr><th>色</th><th>名前</th><th>memo</th><th>操作</th></tr></thead><tbody id="play-groups-list"></tbody></table>
+      </div>
     </section>
   </main>
 
   <!-- Modals (省略せず保持) -->
   <div id="link-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h3>キャラクターの紐付け設定</h3><p style="color: #94a3b8;">対象: <strong id="link-target-name" style="color: #fff; font-size: 1.1em;"></strong></p><div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--accent-color);"><label style="display:block; margin-bottom: 8px; font-weight: bold; color: var(--accent-color);">担当PL (プレイヤー) を設定</label><select id="link-pc-pl" style="width: 100%;"><option value="">-- 変更しない / 未設定 --</option></select></div><div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;"><label style="display:block; margin-bottom: 8px; font-weight: bold;">それぞれ個別に新規PCとして登録</label><button id="btn-create-individual-link" style="width: 100%;">独立したPCとして登録</button></div><div style="text-align: center; margin: 10px 0; color: #94a3b8;">または</div><div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px;"><label style="display:block; margin-bottom: 8px; font-weight: bold;">既存のPCに全てまとめる</label><div class="searchable-select" id="link-pc-dropdown"><input type="text" class="select-search" placeholder="PC名を入力・検索..." autocomplete="off"><input type="hidden" id="link-pc-id-value" class="select-value"><ul class="select-options hidden"></ul></div><button id="btn-save-link" style="width: 100%; margin-top: 10px;" class="outline">選択したPCにまとめる</button></div><div style="display: flex; justify-content: flex-end; margin-top: 20px;"><button class="outline" onclick="document.getElementById('link-modal-wrapper').classList.add('hidden')">キャンセル</button></div></div></div>
   <div id="pc-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>PC情報の編集</h2><p style="color: #94a3b8;">ログ上の名前: <strong id="edit-alias-name-display" style="color: #fff;"></strong></p><label style="display:block; margin-bottom:15px; color: var(--accent-color); font-weight: bold;">担当PL:<br><select id="edit-pc-pl" style="width: 100%; margin-top: 5px;"><option value="">-- 未設定 --</option></select></label><label style="display:block; margin-bottom:15px;">紐付け先PC:<br><div class="searchable-select" id="edit-pc-dropdown"><input type="text" class="select-search" placeholder="PC名を入力・検索..." autocomplete="off"><input type="hidden" id="edit-pc-id-value" class="select-value"><ul class="select-options hidden"></ul></div></label><label style="display:flex; align-items: center; gap: 10px; margin-bottom:20px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px;"><input type="checkbox" id="edit-pc-excluded"><span>自動貯金の対象から除外する（旧設定）</span></label><div style="display: flex; justify-content: space-between; border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 10px;"><button id="btn-unlink-pc" class="danger">紐付けを解除</button><button id="btn-delete-pc" class="danger outline">PCを削除</button><div style="display: flex; gap: 10px;"><button class="outline" onclick="document.getElementById('pc-edit-modal-wrapper').classList.add('hidden')">キャンセル</button><button id="btn-save-pc-info">保存</button></div></div></div></div>
+  <div id="play-group-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2 id="play-group-edit-title">プレイグループ</h2><label style="display:block;margin-bottom:15px;">名前:<br><input id="edit-play-group-name" type="text" style="width:calc(100% - 22px);margin-top:5px;"></label><label style="display:block;margin-bottom:15px;">色:<br><input id="edit-play-group-color" type="color" value="#ff758c" style="width:80px;height:42px;margin-top:5px;"></label><label style="display:block;margin-bottom:15px;">memo:<br><textarea id="edit-play-group-memo" rows="4" style="width:calc(100% - 22px);margin-top:5px;background:rgba(0,0,0,.2);color:#fff;border:1px solid var(--border-color);border-radius:12px;padding:10px;"></textarea></label><div style="display:flex;justify-content:flex-end;gap:10px;"><button class="outline" onclick="document.getElementById('play-group-edit-modal-wrapper').classList.add('hidden')">キャンセル</button><button id="btn-save-play-group">保存</button></div></div></div>
   <div id="rule-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>貯金ルールの編集</h2><label style="display:block; margin-bottom:10px;">ルール名: <input type="text" id="edit-rule-name" style="width: calc(100% - 22px);"></label><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><label>種類<select id="edit-rule-type"><option value="saving">貯金</option><option value="expense">支出</option></select></label><label>きっかけ<select id="edit-rule-trigger"><option value="roll">ダイス</option><option value="session">セッション</option><option value="manual">手動</option></select></label><label>金額方式<select id="edit-rule-amount-mode"><option value="fixed">固定金額</option><option value="input">都度入力</option></select></label><label>金額(円)<input type="number" id="edit-rule-amount" min="0"></label></div><label style="display:block; margin:10px 0;">誰の？<select id="edit-rule-scope"><option value="all">全員</option><option value="self">自分</option><option value="specific">指定character/PL</option></select></label><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;"><label>対象PL（複数可）<select id="edit-rule-pl-ids" multiple size="3"></select></label><label>対象character（複数可）<select id="edit-rule-pc-ids" multiple size="3"></select></label></div><label style="display:block; margin-bottom:10px;">立場（複数可）<br><label><input type="checkbox" class="rule-role-check" value="PC"> PC</label> <label><input type="checkbox" class="rule-role-check" value="KPC"> KPC</label> <label><input type="checkbox" class="rule-role-check" value="GM"> GM</label></label><label style="display:block; margin-bottom:10px;">出目（カンマ区切り）: <input type="text" id="edit-rule-rolls" style="width: calc(100% - 22px);"></label><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><label>最小値<input type="number" id="edit-rule-roll-min"></label><label>最大値<input type="number" id="edit-rule-roll-max"></label></div><label style="display:block; margin:10px 0;">結果:<br><div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;"><label><input type="checkbox" class="rule-result-check" value="critical"> クリ</label><label><input type="checkbox" class="rule-result-check" value="special"> スペシャル</label><label><input type="checkbox" class="rule-result-check" value="success"> 成功</label><label><input type="checkbox" class="rule-result-check" value="hard"> ハード</label><label><input type="checkbox" class="rule-result-check" value="extreme"> イクストリーム</label><label><input type="checkbox" class="rule-result-check" value="failure"> 失敗</label><label><input type="checkbox" class="rule-result-check" value="fumble"> ファンブル</label></div></label><label><input type="checkbox" id="edit-rule-judgement-only" checked> 判定rollのみ</label><div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;"><button id="btn-save-rule">保存</button><button class="outline" onclick="document.getElementById('rule-edit-modal-wrapper').classList.add('hidden')">キャンセル</button></div></div></div>
-  <div id="session-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>セッション編集</h2><label style="display:block; margin-bottom:15px;">シナリオ名:<br><input type="text" id="edit-session-title" style="width: calc(100% - 22px); margin-top: 5px;"></label><label style="display:block; margin-bottom:15px;">セッション日:<br><input type="date" id="edit-session-date" style="width: calc(100% - 22px); margin-top: 5px;"></label><label style="display:block; margin-bottom:15px;">代表画像:<br><input type="file" id="edit-session-image" accept="image/*" style="width: calc(100% - 22px); margin-top: 5px;"></label><img id="edit-session-preview" style="max-width: 100%; max-height: 200px; display: none; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--border-color);" /><div style="display: flex; gap: 10px; justify-content: flex-end;"><button id="btn-save-session">保存</button><button class="outline" onclick="document.getElementById('session-edit-modal-wrapper').classList.add('hidden')">キャンセル</button></div></div></div>
+  <div id="session-edit-modal-wrapper" class="modal-overlay hidden"><div class="modal"><h2>セッション編集</h2><label style="display:block; margin-bottom:15px;">シナリオ名:<br><input type="text" id="edit-session-title" style="width: calc(100% - 22px); margin-top: 5px;"></label><label style="display:block; margin-bottom:15px;">セッション日:<br><input type="date" id="edit-session-date" style="width: calc(100% - 22px); margin-top: 5px;"></label><label style="display:block; margin-bottom:15px;">プレイグループ（複数可）:<br><select id="edit-session-play-groups" multiple size="4" style="width:100%;margin-top:5px;"></select></label><label style="display:block; margin-bottom:15px;">代表画像:<br><input type="file" id="edit-session-image" accept="image/*" style="width: calc(100% - 22px); margin-top: 5px;"></label><img id="edit-session-preview" style="max-width: 100%; max-height: 200px; display: none; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--border-color);" /><div style="display: flex; gap: 10px; justify-content: flex-end;"><button id="btn-save-session">保存</button><button class="outline" onclick="document.getElementById('session-edit-modal-wrapper').classList.add('hidden')">キャンセル</button></div></div></div>
   <div id="ledger-detail-modal-wrapper" class="modal-overlay hidden"><div class="modal large"><h2>履歴の詳細</h2><p style="color: #94a3b8; margin-bottom: 15px;" id="ledger-detail-info"></p><div id="ledger-detail-list" style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; max-height: 400px; overflow-y: auto;"></div><div style="display: flex; justify-content: flex-end; margin-top: 20px;"><button class="outline" onclick="document.getElementById('ledger-detail-modal-wrapper').classList.add('hidden')">閉じる</button></div></div></div>
   <div id="calendar-detail-modal-wrapper" class="modal-overlay hidden"><div class="modal large"><h2 id="calendar-detail-date">日付詳細</h2><div id="calendar-detail-content" style="line-height:1.7;"></div><div style="display:flex; justify-content:flex-end; margin-top:20px;"><button class="outline" onclick="document.getElementById('calendar-detail-modal-wrapper').classList.add('hidden')">閉じる</button></div></div></div>
 
@@ -347,6 +370,7 @@
   <script src="src/parser.js"></script>
   <script src="src/savings.js"></script>
   <script src="src/dashboard.js"></script>
+  <script src="src/analysis.js"></script>
   <script>
     // --- クイック入力設定 ---
     function setManualData(label, amount, type, icon) {
@@ -401,15 +425,15 @@
       });
     }
 
-    // Phase 2 adds stable identity, session roles, and roll overrides without
-    // changing the existing store names or confirmed ledger records.
+    // Phase 2/5 adds identity, roll overrides, and analysis groups without
+    // changing existing records or confirmed ledgers.
     const initDB = () => {
       return new Promise((resolve, reject) => {
-        const request = indexedDB.open('TRPGBankDB_v9', 4);
+        const request = indexedDB.open('TRPGBankDB_v9', 5);
         request.onupgradeneeded = (e) => {
           const database = e.target.result;
           const upgradeTx = e.target.transaction;
-          const storeNames = ['sessions', 'sourceLogs', 'rollRecords', 'ledgerEntries', 'parsedItems', 'statusChanges', 'aliasMappings', 'pcs', 'pls', 'savingsRules', 'sessionParticipants', 'rollOverrides', 'savingsCandidateDecisions'];
+          const storeNames = ['sessions', 'sourceLogs', 'rollRecords', 'ledgerEntries', 'parsedItems', 'statusChanges', 'aliasMappings', 'pcs', 'pls', 'savingsRules', 'sessionParticipants', 'rollOverrides', 'savingsCandidateDecisions', 'playGroups', 'sessionPlayGroups'];
           const aliasExists = database.objectStoreNames.contains('aliasMappings');
           const aliasNeedsRekey = aliasExists && upgradeTx.objectStore('aliasMappings').keyPath !== 'id';
           const createAliasIndexes = store => {
@@ -450,6 +474,11 @@
                 store.createIndex('candidateKey', 'candidateKey', { unique: false });
                 store.createIndex('sessionId', 'sessionId', { unique: false });
                 store.createIndex('ledgerEntryId', 'ledgerEntryId', { unique: false });
+              }
+              if (name === 'sessionPlayGroups') {
+                store.createIndex('sessionId', 'sessionId', { unique: false });
+                store.createIndex('playGroupId', 'playGroupId', { unique: false });
+                store.createIndex('sessionPlayGroup', ['sessionId', 'playGroupId'], { unique: true });
               }
               if (name === 'aliasMappings') {
                 store.createIndex('rawSpeakerNormalized', 'rawSpeakerNormalized', { unique: false });
@@ -799,12 +828,20 @@
     document.getElementById('session-table-container').addEventListener('click', e => {
       if (e.target.classList.contains('btn-session-edit')) {
         const sessionId = e.target.dataset.id;
-        db.transaction(['sessions'], 'readonly').objectStore('sessions').get(sessionId).onsuccess = ev => {
+        const tx = db.transaction(['sessions', 'playGroups', 'sessionPlayGroups'], 'readonly');
+        tx.objectStore('sessions').get(sessionId).onsuccess = ev => {
           const s = ev.target.result; if (!s) return;
           editingSessionId = s.id; document.getElementById('edit-session-title').value = s.title; document.getElementById('edit-session-date').value = s.dateStart || '';
           const preview = document.getElementById('edit-session-preview');
           if (s.imageAssetId) { preview.src = s.imageAssetId; preview.style.display = 'block'; } else { preview.src = ''; preview.style.display = 'none'; }
           document.getElementById('session-edit-modal-wrapper').classList.remove('hidden');
+        };
+        tx.objectStore('playGroups').getAll().onsuccess = ev => {
+          document.getElementById('edit-session-play-groups').innerHTML = (ev.target.result || []).sort((a, b) => String(a.name).localeCompare(String(b.name))).map(group => `<option value="${phase4Escape(group.id)}">${phase4Escape(group.name)}</option>`).join('');
+        };
+        tx.objectStore('sessionPlayGroups').index('sessionId').getAll(sessionId).onsuccess = ev => {
+          const selected = new Set((ev.target.result || []).map(relation => relation.playGroupId));
+          Array.from(document.getElementById('edit-session-play-groups').options).forEach(option => { option.selected = selected.has(option.value); });
         };
       }
     });
@@ -829,12 +866,17 @@
           }; img.src = dataUrl;
         });
       }
-      const tx = db.transaction(['sessions'], 'readwrite');
+      const tx = db.transaction(['sessions', 'sessionPlayGroups'], 'readwrite');
       tx.objectStore('sessions').get(editingSessionId).onsuccess = e => {
         const s = e.target.result; s.title = document.getElementById('edit-session-title').value; s.dateStart = document.getElementById('edit-session-date').value;
         if (dataUrl && dataUrl.startsWith('data:image')) s.imageAssetId = dataUrl; s.updatedAt = new Date().toISOString(); tx.objectStore('sessions').put(s);
       };
-      tx.oncomplete = () => { document.getElementById('session-edit-modal-wrapper').classList.add('hidden'); renderSessionList(db); renderDashboardSummary(db); };
+      tx.objectStore('sessionPlayGroups').index('sessionId').getAll(editingSessionId).onsuccess = e => {
+        const relationStore = tx.objectStore('sessionPlayGroups');
+        (e.target.result || []).forEach(relation => relationStore.delete(relation.id));
+        Array.from(document.getElementById('edit-session-play-groups').selectedOptions).forEach(option => relationStore.put(TRPGAnalysis.createSessionPlayGroupRecord({ sessionId: editingSessionId, playGroupId: option.value })));
+      };
+      tx.oncomplete = () => { document.getElementById('session-edit-modal-wrapper').classList.add('hidden'); renderSessionList(db); renderDashboardSummary(db); renderOverallAnalysis(db); };
     });
 
     // --- People Management UI ---
@@ -1046,6 +1088,55 @@
     window.deletePl = function(id) { if(confirm('このPLを削除しますか？\n（PCとの紐付けは解除されますが、ログ自体は消えません）')) { const tx = db.transaction(['pls', 'pcs', 'sessionParticipants', 'aliasMappings'], 'readwrite'); tx.objectStore('pls').delete(id); tx.objectStore('pcs').getAll().onsuccess = e => { e.target.result.forEach(pc => { if(pc.plId === id) { pc.plId = null; pc.updatedAt = new Date().toISOString(); tx.objectStore('pcs').put(pc); } }); }; tx.objectStore('sessionParticipants').getAll().onsuccess = e => { e.target.result.forEach(participant => { if (participant.plId === id) { participant.plId = null; participant.updatedAt = new Date().toISOString(); tx.objectStore('sessionParticipants').put(participant); } }); }; tx.objectStore('aliasMappings').getAll().onsuccess = e => { e.target.result.forEach(mapping => { if (mapping.plId === id) { mapping.plId = null; mapping.updatedAt = new Date().toISOString(); tx.objectStore('aliasMappings').put(mapping); } }); }; tx.oncomplete = () => loadPeopleData(db); } };
     document.getElementById('btn-save-my-pl').addEventListener('click', () => { myPlId = document.getElementById('setting-my-pl').value; localStorage.setItem('myPlId', myPlId); alert('自分のPL設定を保存しました。'); loadPeopleData(db); renderSavings(db); });
 
+    // --- Phase 5A-1 play group management ---
+    let currentPlayGroups = [], editingPlayGroupId = null;
+    function phase5GroupColor(value) { return /^#[0-9a-f]{6}$/i.test(String(value || '')) ? String(value) : '#64748b'; }
+    async function loadPlayGroups(database) {
+      return new Promise(resolve => {
+        const tx = database.transaction(['playGroups'], 'readonly');
+        tx.objectStore('playGroups').getAll().onsuccess = event => {
+          currentPlayGroups = (event.target.result || []).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+          const empty = document.getElementById('play-group-empty');
+          const tbody = document.getElementById('play-groups-list');
+          if (!tbody) return resolve();
+          empty?.classList.toggle('hidden', currentPlayGroups.length > 0);
+          tbody.innerHTML = currentPlayGroups.map(group => `<tr><td><span class="play-group-color" style="background:${phase5GroupColor(group.color)}"></span>${phase4Escape(phase5GroupColor(group.color))}</td><td><strong>${phase4Escape(group.name)}</strong></td><td>${phase4Escape(group.memo || '')}</td><td><button class="outline btn-edit-play-group" data-id="${phase4Escape(group.id)}">編集</button> <button class="danger btn-delete-play-group" data-id="${phase4Escape(group.id)}">削除</button></td></tr>`).join('');
+          resolve();
+        };
+        tx.onerror = () => resolve();
+      });
+    }
+    function openPlayGroupEditor(id) {
+      const group = currentPlayGroups.find(item => item.id === id);
+      editingPlayGroupId = id || null;
+      document.getElementById('play-group-edit-title').textContent = group ? 'プレイグループを編集' : 'プレイグループを作成';
+      document.getElementById('edit-play-group-name').value = group?.name || '';
+      document.getElementById('edit-play-group-color').value = phase5GroupColor(group?.color || '#ff758c');
+      document.getElementById('edit-play-group-memo').value = group?.memo || '';
+      document.getElementById('play-group-edit-modal-wrapper').classList.remove('hidden');
+    }
+    document.getElementById('btn-create-play-group').addEventListener('click', () => openPlayGroupEditor(null));
+    document.getElementById('play-groups-list').addEventListener('click', event => {
+      const edit = event.target.closest('.btn-edit-play-group');
+      if (edit) return openPlayGroupEditor(edit.dataset.id);
+      const remove = event.target.closest('.btn-delete-play-group');
+      if (!remove || !confirm('このプレイグループを削除しますか？\nセッション・ログ・貯金記録は削除されません。')) return;
+      const tx = db.transaction(['playGroups', 'sessionPlayGroups'], 'readwrite');
+      tx.objectStore('playGroups').delete(remove.dataset.id);
+      tx.objectStore('sessionPlayGroups').index('playGroupId').getAll(remove.dataset.id).onsuccess = event => (event.target.result || []).forEach(relation => tx.objectStore('sessionPlayGroups').delete(relation.id));
+      tx.oncomplete = () => { loadPlayGroups(db); renderSessionList(db); renderOverallAnalysis(db); };
+    });
+    document.getElementById('btn-save-play-group').addEventListener('click', () => {
+      const name = document.getElementById('edit-play-group-name').value.trim();
+      if (!name) return alert('グループ名を入力してください。');
+      const now = new Date().toISOString();
+      const current = currentPlayGroups.find(group => group.id === editingPlayGroupId);
+      const record = TRPGAnalysis.createPlayGroupRecord({ ...current, id: editingPlayGroupId || undefined, name, color: phase5GroupColor(document.getElementById('edit-play-group-color').value), memo: document.getElementById('edit-play-group-memo').value, createdAt: current?.createdAt || now, updatedAt: now }, now);
+      const tx = db.transaction(['playGroups'], 'readwrite');
+      tx.objectStore('playGroups').put(record);
+      tx.oncomplete = () => { document.getElementById('play-group-edit-modal-wrapper').classList.add('hidden'); loadPlayGroups(db); renderSessionList(db); renderOverallAnalysis(db); };
+    });
+
     // --- Savings Rules UI ---
     let currentRules = [];
     async function loadSavingsRules(db) {
@@ -1224,72 +1315,141 @@
       setTimeout(() => document.querySelector(`[data-review-session="${button.dataset.dashboardReview}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
     });
 
-    // --- Analysis ---
-    const SUCCESS_RESULTS = ['critical', 'special', 'success', 'hard', 'extreme'], FAILURE_RESULTS = ['failure', 'fumble'];
-    function calculateStats(judgements) {
-      let successCount = 0, critCount = 0, fumbleCount = 0, exact1Count = 0, exact100Count = 0;
-      judgements.forEach(r => {
-        if (SUCCESS_RESULTS.includes(r.result)) successCount++;
-        if (r.result === 'critical') critCount++;
-        if (r.result === 'fumble') fumbleCount++;
-        if (r.isExact1) exact1Count++;
-        if (r.isExact100) exact100Count++;
+    // --- Phase 5A-1 shared filter UI ---
+    let analysisContextCache = null;
+    let analysisFilterState = TRPGAnalysis.normalizeAnalysisFilter();
+    const analysisFilterLabels = { plIds: 'PL', pcIds: 'PC', sessionIds: 'シナリオ', playGroupIds: 'グループ', roles: 'role', systems: 'system', skills: '技能', skillCategories: '技能カテゴリ' };
+
+    function phase5ReadAnalysisData(database) {
+      return new Promise((resolve, reject) => {
+        const stores = ['rollRecords', 'sessions', 'pcs', 'pls', 'aliasMappings', 'sessionParticipants', 'rollOverrides', 'statusChanges', 'playGroups', 'sessionPlayGroups'];
+        const tx = database.transaction(stores, 'readonly');
+        const data = {};
+        stores.forEach(name => tx.objectStore(name).getAll().onsuccess = event => { data[name] = event.target.result || []; });
+        tx.oncomplete = () => resolve(data);
+        tx.onerror = () => reject(tx.error);
       });
-      const t = judgements.length;
-      return { total: t, successRate: t ? (successCount/t)*100 : 0, critRate: t ? (critCount/t)*100 : 0, fumbleRate: t ? (fumbleCount/t)*100 : 0, exact1Count, exact100Count, successCount };
     }
     
-    async function renderOverallAnalysis(db) {
-      return new Promise(resolve => {
-        const tx = db.transaction(['rollRecords', 'sessions', 'pcs', 'pls', 'aliasMappings', 'sessionParticipants', 'rollOverrides'], 'readonly');
-        let rolls = [], sessions = [], pcs = [], pls = [], aliases = [], participants = [], overrides = [];
-        tx.objectStore('rollRecords').getAll().onsuccess = e => rolls = e.target.result;
-        tx.objectStore('sessions').getAll().onsuccess = e => sessions = e.target.result;
-        tx.objectStore('pcs').getAll().onsuccess = e => pcs = e.target.result;
-        tx.objectStore('pls').getAll().onsuccess = e => pls = e.target.result;
-        tx.objectStore('aliasMappings').getAll().onsuccess = e => aliases = e.target.result;
-        tx.objectStore('sessionParticipants').getAll().onsuccess = e => participants = e.target.result;
-        tx.objectStore('rollOverrides').getAll().onsuccess = e => overrides = e.target.result;
+    function phase5SelectOptions(options, selected) {
+      return (options || []).map(option => {
+        const value = option.id == null ? option.value : option.id;
+        const label = option.name || option.title || option.label || option.value || option.id;
+        return '<option value="' + phase4Escape(value) + '"' + (selected.includes(String(value)) ? ' selected' : '') + '>' + phase4Escape(label) + ' (' + (option.count || 0) + ')</option>';
+      }).join('');
+    }
         
-        tx.oncomplete = () => {
-          const resolvedRolls = TRPGIdentity.applyRollOverrides(rolls, overrides);
-          const judgements = resolvedRolls.filter(r => {
-            if (!r.isJudgement || r.result === 'unknown' || r.analysisExcluded) return false;
-            return !TRPGIdentity.resolveSpeaker({ rawSpeaker: r.rawSpeaker, sessionId: r.sessionId, mappings: aliases, pcs, pls, sessionParticipants: participants }).ignored;
-          });
-          const stats = calculateStats(judgements);
-          
-          if (judgements.length === 0) {
-            document.getElementById('analysis-content').innerHTML = '<div class="card">分析できるダイス判定データがありません。</div>';
-            return resolve();
-          }
-
-          let html = `<div class="card" style="display:flex; gap: 20px; justify-content: space-between; flex-wrap: wrap;">
-            <div><p style="margin:0; color:#94a3b8; font-size:0.9em;">総セッション数</p><h2>${sessions.length}</h2></div>
-            <div><p style="margin:0; color:#94a3b8; font-size:0.9em;">総判定数</p><h2>${stats.total}</h2></div>
-            <div><p style="margin:0; color:#94a3b8; font-size:0.9em;">全体成功率</p><h2 style="color:var(--success);">${stats.successRate.toFixed(1)}%</h2></div>
-            <div><p style="margin:0; color:#94a3b8; font-size:0.9em;">クリティカル率</p><h2 style="color:#fcd34d;">${stats.critRate.toFixed(1)}%</h2></div>
-            <div><p style="margin:0; color:#94a3b8; font-size:0.9em;">ファンブル率</p><h2 style="color:var(--danger);">${stats.fumbleRate.toFixed(1)}%</h2></div>
-          </div>`;
-          
-          const pcStats = {};
-          judgements.forEach(r => {
-            const pcId = TRPGIdentity.resolveSpeaker({ rawSpeaker: r.rawSpeaker, sessionId: r.sessionId, mappings: aliases, pcs, pls, sessionParticipants: participants }).pcId;
-            if (pcId) {
-              if (!pcStats[pcId]) pcStats[pcId] = { id: pcId, rolls: [] };
-              pcStats[pcId].rolls.push(r);
-            }
-          });
-
-          html += `<h3>PC別 分析</h3><table><tr><th>PC名</th><th>判定数</th><th>成功率</th><th>クリ率</th><th>F率</th></tr>`;
-          Object.values(pcStats).sort((a,b) => b.rolls.length - a.rolls.length).forEach(ps => {
-            const s = calculateStats(ps.rolls), pc = pcs.find(p => p.id === ps.id);
-            html += `<tr><td><strong style="color:var(--accent-color);">${pc ? pc.name : '不明'}</strong></td><td>${s.total}</td><td>${s.successRate.toFixed(1)}%</td><td>${s.critRate.toFixed(1)}%</td><td>${s.fumbleRate.toFixed(1)}%</td></tr>`;
-          });
-          document.getElementById('analysis-content').innerHTML = html + `</table>`;
-          resolve();
-        };
+    function phase5ReadFilter() {
+      const values = id => Array.from(document.getElementById(id)?.selectedOptions || []).map(option => option.value);
+      return TRPGAnalysis.normalizeAnalysisFilter({
+        dateRange: { from: document.getElementById('analysis-date-from')?.value || null, to: document.getElementById('analysis-date-to')?.value || null },
+        plIds: values('analysis-filter-pl'), pcIds: values('analysis-filter-pc'), sessionIds: values('analysis-filter-session'), playGroupIds: values('analysis-filter-group'), roles: values('analysis-filter-role'), systems: values('analysis-filter-system'), skills: values('analysis-filter-skill'),
+        judgementOnly: Boolean(document.getElementById('analysis-filter-judgement')?.checked)
       });
+    }
+          
+    function phase5RenderFilterChips(dimensions) {
+      const target = document.getElementById('analysis-filter-chips');
+      if (!target) return;
+      const labels = {};
+      ['pls', 'pcs', 'sessions', 'playGroups'].forEach(key => (dimensions[key] || []).forEach(option => { labels[option.id] = option.name || option.title || option.id; }));
+      (dimensions.roleOptions || []).forEach(option => { labels[option.value] = option.label; });
+      [...(dimensions.systems || []), ...(dimensions.skills || [])].forEach(option => { labels[option.value] = option.label; });
+      const chips = [];
+      if (analysisFilterState.dateRange.from || analysisFilterState.dateRange.to) chips.push('<span class="analysis-filter-chip">期間: ' + (analysisFilterState.dateRange.from || '指定なし') + '〜' + (analysisFilterState.dateRange.to || '指定なし') + ' <button aria-label="期間を解除" data-analysis-clear="dateRange">×</button></span>');
+      Object.entries(analysisFilterLabels).forEach(([key, label]) => (analysisFilterState[key] || []).forEach(value => chips.push('<span class="analysis-filter-chip">' + phase4Escape(label) + ': ' + phase4Escape(labels[value] || (value === TRPGAnalysis.UNGROUPED ? 'グループ未設定' : value)) + ' <button aria-label="条件を解除" data-analysis-clear="' + key + '" data-analysis-value="' + phase4Escape(value) + '">×</button></span>')));
+      if (analysisFilterState.judgementOnly) chips.push('<span class="analysis-filter-chip">判定rollのみ <button aria-label="判定rollのみを解除" data-analysis-clear="judgementOnly">×</button></span>');
+      target.innerHTML = chips.join('') || '<span style="color:#94a3b8;font-size:.82rem;">適用中の条件はありません。</span>';
+    }
+
+    function phase5RenderFilterBar(context) {
+      const target = document.getElementById('analysis-filter-container');
+      if (!target) return;
+      const dimensions = TRPGAnalysis.buildAnalysisDimensions(context);
+      const filter = analysisFilterState;
+      target.innerHTML = '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><div><strong>共通フィルター</strong><div style="color:#94a3b8;font-size:.82rem;margin-top:4px;">同じ条件内はOR、条件同士はANDです。</div></div><button id="analysis-filter-reset" class="outline">すべて解除</button></div>' +
+        '<div class="analysis-filter-grid" style="margin-top:14px;">' +
+        '<label class="analysis-filter-field">期間（開始）<input id="analysis-date-from" type="date" value="' + (filter.dateRange.from || '') + '" aria-label="分析期間の開始"></label>' +
+        '<label class="analysis-filter-field">期間（終了）<input id="analysis-date-to" type="date" value="' + (filter.dateRange.to || '') + '" aria-label="分析期間の終了"></label>' +
+        '<label class="analysis-filter-field">PL<select id="analysis-filter-pl" multiple size="3" aria-label="PLで絞り込み">' + phase5SelectOptions(dimensions.pls, filter.plIds) + '</select></label>' +
+        '<label class="analysis-filter-field">PC<select id="analysis-filter-pc" multiple size="3" aria-label="PCで絞り込み">' + phase5SelectOptions(dimensions.pcs, filter.pcIds) + '</select></label>' +
+        '<label class="analysis-filter-field">シナリオ / session<select id="analysis-filter-session" multiple size="3" aria-label="シナリオで絞り込み">' + phase5SelectOptions((dimensions.sessions || []).map(item => ({ ...item, name: item.title || item.name || item.id })), filter.sessionIds) + '</select></label>' +
+        '<label class="analysis-filter-field">プレイグループ<select id="analysis-filter-group" multiple size="3" aria-label="プレイグループで絞り込み">' + phase5SelectOptions(dimensions.playGroups, filter.playGroupIds) + '</select></label>' +
+        '<label class="analysis-filter-field">role<select id="analysis-filter-role" multiple size="3" aria-label="roleで絞り込み">' + phase5SelectOptions(dimensions.roleOptions, filter.roles) + '</select></label>' +
+        '<label class="analysis-filter-field">system<select id="analysis-filter-system" multiple size="3" aria-label="systemで絞り込み">' + phase5SelectOptions(dimensions.systems.map(item => ({ ...item, id: item.value, name: item.label })), filter.systems) + '</select></label>' +
+        '<label class="analysis-filter-field">技能<select id="analysis-filter-skill" multiple size="3" aria-label="技能で絞り込み">' + phase5SelectOptions(dimensions.skills.map(item => ({ ...item, id: item.value, name: item.label })), filter.skills) + '</select></label></div>' +
+        '<label style="display:inline-flex;align-items:center;gap:8px;margin-top:14px;color:#cbd5e1;"><input id="analysis-filter-judgement" type="checkbox"' + (filter.judgementOnly ? ' checked' : '') + '> 判定rollのみ</label><div id="analysis-filter-chips" class="analysis-filter-chips"></div><div id="analysis-filter-count" style="margin-top:10px;color:#cbd5e1;font-size:.9rem;"></div></div>';
+      phase5RenderFilterChips(dimensions);
+      if (!target.dataset.bound) {
+        target.dataset.bound = 'true';
+        target.addEventListener('change', event => {
+          if (!event.target.id.startsWith('analysis-')) return;
+          analysisFilterState = phase5ReadFilter();
+          phase5RenderFilteredAnalysis();
+        });
+        target.addEventListener('click', event => {
+          const button = event.target.closest('[data-analysis-clear]');
+          if (button) {
+            if (button.dataset.analysisClear === 'dateRange') analysisFilterState.dateRange = { from: null, to: null };
+            else if (button.dataset.analysisClear === 'judgementOnly') analysisFilterState.judgementOnly = false;
+            else analysisFilterState[button.dataset.analysisClear] = (analysisFilterState[button.dataset.analysisClear] || []).filter(value => value !== button.dataset.analysisValue);
+            phase5RenderFilteredAnalysis();
+          }
+          if (event.target.closest('#analysis-filter-reset')) { analysisFilterState = TRPGAnalysis.normalizeAnalysisFilter(); phase5RenderFilteredAnalysis(); }
+        });
+      }
+    }
+
+    function phase5RenderBasicStats(context) {
+      const target = document.getElementById('analysis-content');
+      if (!target) return;
+      if (!context.rawRolls.length && !context.sessions.length) {
+        target.innerHTML = '<div class="card dashboard-empty">まだ分析できるログがありません。</div>';
+        return;
+      }
+      const filtered = TRPGAnalysis.applyAnalysisFilter(context, analysisFilterState);
+      if (!filtered.sessions.length && !filtered.resolvedRolls.length) {
+        const countLabel = document.getElementById('analysis-filter-count');
+        if (countLabel) countLabel.textContent = '対象: 0卓 / 0判定';
+        target.innerHTML = '<div class="card dashboard-empty">この条件に一致する記録はありません。</div>';
+        return;
+      }
+      const stats = TRPGAnalysis.calculateBasicStats(filtered);
+      const pcStats = new Map();
+      filtered.resolvedRolls.filter(roll => roll.isJudgement && roll.pcId).forEach(roll => { if (!pcStats.has(roll.pcId)) pcStats.set(roll.pcId, []); pcStats.get(roll.pcId).push(roll); });
+      const pcRows = [...pcStats.entries()].sort((a, b) => b[1].length - a[1].length).map(([pcId, rolls]) => {
+        const summary = TRPGAnalysis.calculateBasicStats({ rolls, resolvedRolls: rolls, sessions: filtered.sessions });
+        return '<tr><td>' + phase4Escape(context.pcMap.get(pcId)?.name || pcId) + '</td><td>' + summary.judgementCount + '</td><td>' + (summary.successRate * 100).toFixed(1) + '%</td><td>' + summary.critical + '</td><td>' + summary.fumble + '</td></tr>';
+      }).join('');
+      const average = stats.averageRoll == null ? '-' : stats.averageRoll.toFixed(1) + ' (' + stats.averageRollSampleCount + '件)';
+      const countLabel = document.getElementById('analysis-filter-count');
+      if (countLabel) countLabel.textContent = '対象: ' + stats.sessionCount + '卓 / ' + stats.judgementCount + '判定';
+      target.innerHTML = '<div class="card"><div class="analysis-stats-grid">' +
+        '<div class="analysis-stat-card"><small>対象卓</small><strong>' + stats.sessionCount + '</strong></div>' +
+        '<div class="analysis-stat-card"><small>対象roll</small><strong>' + stats.rollCount + '</strong></div>' +
+        '<div class="analysis-stat-card"><small>判定（分類済）</small><strong>' + stats.classifiedJudgementCount + '/' + stats.judgementCount + '</strong></div>' +
+        '<div class="analysis-stat-card"><small>成功率</small><strong style="color:var(--success);">' + (stats.successRate * 100).toFixed(1) + '%</strong><small>' + stats.success + ' / ' + stats.successRateDenominator + '</small></div>' +
+        '<div class="analysis-stat-card"><small>成功</small><strong>' + stats.success + '</strong></div><div class="analysis-stat-card"><small>失敗</small><strong>' + stats.failure + '</strong></div>' +
+        '<div class="analysis-stat-card"><small>クリティカル</small><strong style="color:#fde047;">' + stats.critical + '</strong></div><div class="analysis-stat-card"><small>ファンブル</small><strong style="color:#d8b4fe;">' + stats.fumble + '</strong></div>' +
+        '<div class="analysis-stat-card"><small>平均出目</small><strong>' + average + '</strong></div></div>' +
+        '<p style="color:#94a3b8;font-size:.85rem;margin-bottom:0;">成功率の分母は分類可能な判定' + stats.successRateDenominator + '件です。unknown判定' + stats.unknownJudgementCount + '件、平均出目サンプル' + stats.averageRollSampleCount + '件。</p></div>' +
+        '<div class="card"><h3>PC別（canonical ID）</h3>' + (pcRows ? '<table><thead><tr><th>PC</th><th>判定</th><th>成功率</th><th>クリ</th><th>ファンブル</th></tr></thead><tbody>' + pcRows + '</tbody></table>' : '<div class="dashboard-empty">PC未整理の判定を含むため、PC別行はありません。</div>') + '</div>' +
+        '<div class="card" style="color:#94a3b8;">詳細分析（技能・比較・ダイス事件簿など）は次のPhaseで追加します。</div>';
+    }
+          
+    function phase5RenderFilteredAnalysis() {
+      if (!analysisContextCache) return;
+      phase5RenderFilterBar(analysisContextCache);
+      phase5RenderBasicStats(analysisContextCache);
+    }
+
+    async function renderOverallAnalysis(database) {
+      try {
+        analysisContextCache = TRPGAnalysis.createAnalysisContext(await phase5ReadAnalysisData(database));
+        phase5RenderFilteredAnalysis();
+      } catch (error) {
+        document.getElementById('analysis-content').innerHTML = '<div class="card">分析データの読み込みに失敗しました: ' + phase4Escape(error.message) + '</div>';
+      }
     }
 
     // --- Phase 3 savings review flow is implemented below. ---
@@ -1512,7 +1672,7 @@
         if (target === 'analysis') renderOverallAnalysis(db);
         if (target === 'savings') renderSavings(db);
         if (target === 'logs') renderSessionList(db);
-        if (target === 'settings') loadSavingsRules(db);
+        if (target === 'settings') { loadSavingsRules(db); loadPlayGroups(db); }
         if (target === 'all-logs') renderAllDiceLogs(db);
       }
     });
@@ -1540,6 +1700,7 @@
       await renderOverallAnalysis(db);
       await renderSavings(db);
       await renderSessionList(db);
+      await loadPlayGroups(db);
 
       linkDropdownCtrl = initSearchableDropdown('link-pc-dropdown', 'link-pc-pl', () => activeAliasNames.length > 0 ? activeAliasNames[0] : "");
       editDropdownCtrl = initSearchableDropdown('edit-pc-dropdown', 'edit-pc-pl', () => editingAliasName);
